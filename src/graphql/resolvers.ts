@@ -608,6 +608,143 @@ export const resolvers = {
       return getOrderWithRelations(newOrder.id);
     },
 
+    applyDiscountCode: async (
+      _: unknown,
+      { orderId, code }: { orderId: string; code: string }
+    ) => {
+      const VALID_DISCOUNTS: Record<string, number> = {
+        SAVE10: 1000,
+        AXIOM10: 1000,
+        SAVE20: 2000,
+        AXIOM20: 2000,
+        SUMMER20: 2000,
+        WELCOME: 500,
+      };
+
+      const normalizedCode = code.trim().toUpperCase();
+      const discountAmount = VALID_DISCOUNTS[normalizedCode];
+      if (!discountAmount) {
+        throw new Error(`Invalid or expired discount code: ${code}. Valid codes: ${Object.keys(VALID_DISCOUNTS).join(', ')}`);
+      }
+
+      const order = await db.query.orders.findFirst({
+        where: eq(schema.orders.id, orderId),
+      });
+      if (!order) {
+        throw new Error(`Order not found: ${orderId}`);
+      }
+      if (order.status !== 'DRAFT') {
+        throw new Error(
+          `Cannot apply discount to order ${orderId} (status is ${order.status}, must be DRAFT)`
+        );
+      }
+
+      const dbLineItems = await db.query.orderLineItems.findMany({
+        where: eq(schema.orderLineItems.orderId, orderId),
+      });
+
+      const machineItems: MachineCartItem[] = dbLineItems.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        sku: item.sku,
+        title: item.title,
+        unitPriceCents: item.unitPriceCents,
+        quantity: item.quantity,
+      }));
+
+      // Zero-trust state machine projection
+      const actor = createCheckoutActor('checkout_draft', {
+        cartId: order.cartId,
+        items: machineItems,
+        subtotalCents: order.subtotalCents,
+        shippingCents: order.shippingCents,
+        taxCents: order.taxCents,
+        discountCode: order.discountCode,
+        discountCents: order.discountCents,
+        totalCents: order.totalCents,
+      });
+
+      actor.send({
+        type: 'APPLY_DISCOUNT',
+        code: normalizedCode,
+        discountCents: discountAmount,
+      });
+
+      const snapshot = actor.getSnapshot();
+      if (snapshot.value !== 'checkout_draft') {
+        throw new Error('State machine rejected APPLY_DISCOUNT');
+      }
+
+      await db
+        .update(schema.orders)
+        .set({
+          discountCode: snapshot.context.discountCode,
+          discountCents: snapshot.context.discountCents,
+          totalCents: snapshot.context.totalCents,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.orders.id, orderId));
+
+      return getOrderWithRelations(orderId);
+    },
+
+    removeDiscountCode: async (
+      _: unknown,
+      { orderId }: { orderId: string }
+    ) => {
+      const order = await db.query.orders.findFirst({
+        where: eq(schema.orders.id, orderId),
+      });
+      if (!order) {
+        throw new Error(`Order not found: ${orderId}`);
+      }
+      if (order.status !== 'DRAFT') {
+        throw new Error(
+          `Cannot remove discount from order ${orderId} (status is ${order.status}, must be DRAFT)`
+        );
+      }
+
+      const dbLineItems = await db.query.orderLineItems.findMany({
+        where: eq(schema.orderLineItems.orderId, orderId),
+      });
+
+      const machineItems: MachineCartItem[] = dbLineItems.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        sku: item.sku,
+        title: item.title,
+        unitPriceCents: item.unitPriceCents,
+        quantity: item.quantity,
+      }));
+
+      const actor = createCheckoutActor('checkout_draft', {
+        cartId: order.cartId,
+        items: machineItems,
+        subtotalCents: order.subtotalCents,
+        shippingCents: order.shippingCents,
+        taxCents: order.taxCents,
+        discountCode: order.discountCode,
+        discountCents: order.discountCents,
+        totalCents: order.totalCents,
+      });
+
+      actor.send({ type: 'REMOVE_DISCOUNT' });
+
+      const snapshot = actor.getSnapshot();
+
+      await db
+        .update(schema.orders)
+        .set({
+          discountCode: null,
+          discountCents: 0,
+          totalCents: snapshot.context.totalCents,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.orders.id, orderId));
+
+      return getOrderWithRelations(orderId);
+    },
+
     attachShippingAddress: async (
       _: unknown,
       { orderId, input }: { orderId: string; input: ShippingAddressInput }

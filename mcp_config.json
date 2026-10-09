@@ -1,13 +1,14 @@
 {
   "mcpServers": {
     "axioma-architecture-engine": {
-      "command": "node",
-      "args": ["-r", "ts-node/register", "src/mcp/server.ts"],
+      "command": "npx",
+      "args": ["tsx", "src/gateway/server.ts"],
       "env": {
         "NODE_ENV": "development",
+        "GATEWAY_PORT": "3001",
+        "TARGET_MCP_URL": "http://localhost:3000",
         "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/axioma"
-      },
-      "description": "Exposes GraphQL schema, PostgreSQL DDL, and XState state boundaries to child subagents."
+      }
     }
   }
 }

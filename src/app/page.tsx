@@ -22,6 +22,8 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
     country: 'USA',
   });
 
+  const [discountInput, setDiscountInput] = useState('SAVE10');
+
   const stateColors: Record<string, string> = {
     empty_cart: '#94a3b8',
     cart_active: '#3b82f6',
@@ -148,6 +150,46 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
           {currentState === 'checkout_draft' && (
             <div>
               <p style={{ color: '#64748b' }}>Order draft initialized. Attach shipping address to proceed.</p>
+
+              {/* Discount Code Application */}
+              <div style={{ padding: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 16 }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                  Promo / Discount Code
+                </label>
+                {context.discountCode ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 700 }}>
+                      Code Applied: {context.discountCode} (-${(context.discountCents / 100).toFixed(2)})
+                    </span>
+                    <button
+                      onClick={() => send({ type: 'REMOVE_DISCOUNT' })}
+                      style={{ padding: '4px 8px', fontSize: '0.75rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. SAVE10, SAVE20"
+                      value={discountInput}
+                      onChange={(e) => setDiscountInput(e.target.value)}
+                      style={{ flex: 1, padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '0.85rem' }}
+                    />
+                    <button
+                      onClick={() => {
+                        const code = discountInput.trim().toUpperCase();
+                        const amount = code === 'SAVE20' || code === 'AXIOM20' || code === 'SUMMER20' ? 2000 : 1000;
+                        send({ type: 'APPLY_DISCOUNT', code, discountCents: amount });
+                      }}
+                      style={{ padding: '6px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </div>
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Recipient Name</label>
                 <input
@@ -418,6 +460,11 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
             <div>Subtotal: ${(context.subtotalCents / 100).toFixed(2)}</div>
             <div>Shipping: ${(context.shippingCents / 100).toFixed(2)}</div>
             <div>Tax (8%): ${(context.taxCents / 100).toFixed(2)}</div>
+            {context.discountCents > 0 && (
+              <div style={{ color: '#16a34a', fontWeight: 600 }}>
+                Discount ({context.discountCode}): -${(context.discountCents / 100).toFixed(2)}
+              </div>
+            )}
             <div style={{ fontWeight: 700, color: '#0f172a', marginTop: 4 }}>
               Total: ${(context.totalCents / 100).toFixed(2)}
             </div>

@@ -155,6 +155,40 @@ describe('Axioma MCP Server - Governance & Tool Conformance', () => {
     assert.ok(result.feedback.includes('Legal transition'));
   });
 
+  test('Governance Tool: introspectStateBoundary includes APPLY_DISCOUNT for checkout_draft', () => {
+    const introspection = mcp.introspectStateBoundary('checkout_draft');
+    assert.ok(introspection.admissibleEvents.includes('APPLY_DISCOUNT'));
+    assert.ok(introspection.admissibleEvents.includes('REMOVE_DISCOUNT'));
+  });
+
+  test('Governance Tool: propose_resolver mathematically rejects APPLY_DISCOUNT from empty_cart', () => {
+    const result = mcp.proposeResolver({
+      mutationName: 'applyDiscountCode',
+      sourceState: 'empty_cart',
+      event: 'APPLY_DISCOUNT',
+      payload: { orderId: 'ord_empty', code: 'SAVE10' },
+      implementationCode: 'console.log("invalid");',
+    });
+
+    assert.strictEqual(result.status, 'REJECTED');
+    assert.ok(result.violations?.includes('ILLEGAL_STATE_TRANSITION'));
+  });
+
+  test('Governance Tool: propose_resolver approves valid applyDiscountCode from checkout_draft', () => {
+    const result = mcp.proposeResolver({
+      mutationName: 'applyDiscountCode',
+      sourceState: 'checkout_draft',
+      event: 'APPLY_DISCOUNT',
+      payload: { orderId: 'ord_draft_1', code: 'SAVE10' },
+      implementationCode: 'await db.update(orders).set({ discountCode: "SAVE10", discountCents: 1000 });',
+    });
+
+    assert.strictEqual(result.status, 'APPROVED');
+    assert.strictEqual(result.sourceState, 'checkout_draft');
+    assert.strictEqual(result.targetState, 'checkout_draft');
+    assert.ok(result.validatedGuards?.includes('hasValidDiscountCode'));
+  });
+
   test('createAxiomaMcpServer factory initializes McpServer with tools and resources', () => {
     const server = createAxiomaMcpServer();
     assert.ok(server);

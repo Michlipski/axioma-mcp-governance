@@ -99,6 +99,8 @@ type Order {
   subtotalCents: Int!
   shippingCents: Int!
   taxCents: Int!
+  discountCode: String
+  discountCents: Int!
   totalCents: Int!
   createdAt: DateTime!
 }
@@ -179,6 +181,10 @@ type Mutation {
 
   # Transition: ACTIVE -> LOCKED_FOR_CHECKOUT (Draft Order created)
   initiateCheckout(cartId: ID!): Order!
+
+  # State: CHECKOUT_DRAFT (Discount code application)
+  applyDiscountCode(orderId: ID!, code: String!): Order!
+  removeDiscountCode(orderId: ID!): Order!
 
   # Transition: DRAFT -> PENDING_PAYMENT
   attachShippingAddress(orderId: ID!, input: ShippingAddressInput!): Order!

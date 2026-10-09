@@ -218,4 +218,28 @@ describe('Apollo GraphQL Resolvers & Zero-Trust State Machine Enforcement', () =
     assert.strictEqual(actor.getSnapshot().context.trackingNumber, 'TRK999');
     assert.strictEqual(actor.getSnapshot().context.carrier, 'DHL');
   });
+
+  test('Zero-Trust Projection: checkout_draft supports APPLY_DISCOUNT and recalculates totalCents', () => {
+    const actor = createCheckoutActor('checkout_draft', {
+      cartId: 'cart_1',
+      items: [{ id: 'i1', productId: 'p1', sku: 'S1', title: 'Tee', unitPriceCents: 5000, quantity: 1 }],
+      subtotalCents: 5000,
+      shippingCents: 0,
+      taxCents: 400,
+      discountCents: 0,
+      discountCode: null,
+      totalCents: 5400,
+    });
+
+    actor.send({ type: 'APPLY_DISCOUNT', code: 'SAVE10', discountCents: 1000 });
+    assert.strictEqual(actor.getSnapshot().value, 'checkout_draft');
+    assert.strictEqual(actor.getSnapshot().context.discountCode, 'SAVE10');
+    assert.strictEqual(actor.getSnapshot().context.discountCents, 1000);
+    assert.strictEqual(actor.getSnapshot().context.totalCents, 4400);
+
+    actor.send({ type: 'REMOVE_DISCOUNT' });
+    assert.strictEqual(actor.getSnapshot().context.discountCode, null);
+    assert.strictEqual(actor.getSnapshot().context.discountCents, 0);
+    assert.strictEqual(actor.getSnapshot().context.totalCents, 5400);
+  });
 });

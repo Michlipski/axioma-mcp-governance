@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // --- Enums ---
@@ -33,6 +33,12 @@ export const fulfillmentStatusEnum = pgEnum('fulfillment_status', [
   'PACKING',
   'SHIPPED',
   'DELIVERED',
+]);
+
+export const auditStatusEnum = pgEnum('audit_status', [
+  'INTERCEPTED',
+  'APPROVED',
+  'REJECTED',
 ]);
 
 // --- Cart Domain ---
@@ -80,6 +86,8 @@ export const orders = pgTable('orders', {
   subtotalCents: integer('subtotal_cents').notNull(),
   shippingCents: integer('shipping_cents').notNull().default(0),
   taxCents: integer('tax_cents').notNull().default(0),
+  discountCode: text('discount_code'),
+  discountCents: integer('discount_cents').notNull().default(0),
   totalCents: integer('total_cents').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -148,5 +156,18 @@ export const fulfillmentJobs = pgTable('fulfillment_jobs', {
   trackingNumber: text('tracking_number'),
   carrier: text('carrier'),
   dispatchedAt: timestamp('dispatched_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// --- AI Governance & Audit Domain ---
+
+export const agentAuditLogs = pgTable('agent_audit_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentId: text('agent_id').notNull(),
+  sessionId: text('session_id').notNull(),
+  toolName: text('tool_name').notNull(),
+  payload: jsonb('payload').notNull(),
+  response: jsonb('response'),
+  status: auditStatusEnum('status').notNull().default('INTERCEPTED'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });

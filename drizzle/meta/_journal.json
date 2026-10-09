@@ -6,7 +6,21 @@
       "idx": 0,
       "version": "7",
       "when": 1791490687666,
-      "tag": "0000_chief_viper",
+      "tag": "0000_initial_checkout_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791576660143,
+      "tag": "0001_agent_audit_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791578066996,
+      "tag": "0002_order_discount_fields",
       "breakpoints": true
     }
   ]

@@ -245,6 +245,16 @@ export class AxiomaMCPServer {
         validatedGuards.push('hasItems');
       }
       targetState = 'checkout_draft';
+    } else if (event === 'APPLY_DISCOUNT') {
+      const code = payload?.code || payload?.discountCode;
+      if (!code || typeof code !== 'string' || code.trim() === '') {
+        violations.push('MISSING_DISCOUNT_CODE: code must be a non-empty string.');
+      } else {
+        validatedGuards.push('hasValidDiscountCode');
+      }
+      targetState = 'checkout_draft';
+    } else if (event === 'REMOVE_DISCOUNT') {
+      targetState = 'checkout_draft';
     } else if (event === 'DISPATCH_FULFILLMENT') {
       const trackingNumber = payload?.trackingNumber;
       const carrier = payload?.carrier;
@@ -255,7 +265,7 @@ export class AxiomaMCPServer {
       }
       targetState = 'fulfilled';
     } else {
-      const transitionDef = stateDef.on?.[event];
+      const transitionDef = (stateDef.on as any)?.[event];
       targetState = typeof transitionDef === 'string' ? transitionDef : (transitionDef as any)?.target || 'unknown';
     }
 
@@ -287,7 +297,7 @@ export class AxiomaMCPServer {
       return `Types: Cart, CartItem, AddItemInput. Mutations: addItemToCart, removeItemFromCart, initiateCheckout`;
     }
     if (stateName === 'checkout_draft' || stateName === 'pending_payment') {
-      return `Types: Order, OrderLineItem, ShippingAddress, ShippingAddressInput, PaymentInput. Mutations: attachShippingAddress, submitPayment`;
+      return `Types: Order, OrderLineItem, ShippingAddress, ShippingAddressInput, PaymentInput. Mutations: attachShippingAddress, applyDiscountCode, removeDiscountCode, submitPayment`;
     }
     if (stateName === 'paid') {
       return `Types: Order, FulfillmentJob. Mutations: dispatchFulfillment`;
@@ -395,7 +405,7 @@ export function createAxiomaMcpServer(baseDir: string = process.cwd()): McpServe
       mutationName: z.string().describe('The GraphQL mutation name, e.g. submitPayment, initiateCheckout, attachShippingAddress'),
       sourceState: z.string().describe('The current XState state, e.g. pending_payment, cart_active'),
       event: z.string().describe('The XState event name to transition on, e.g. SUBMIT_PAYMENT, INITIATE_CHECKOUT'),
-      payload: z.record(z.any()).describe('The input payload including IDs, idempotencyKey, amounts, or address fields'),
+      payload: z.record(z.string(), z.any()).describe('The input payload including IDs, idempotencyKey, amounts, or address fields'),
       implementationCode: z.string().describe('The TypeScript/Drizzle/PostgreSQL code implementing the mutation resolver'),
     },
     async (input) => {

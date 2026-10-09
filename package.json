@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test": "tsx --test tests/*.test.ts",
     "mcp:server": "tsx src/mcp/index.ts",
+    "mcp:gateway": "tsx src/gateway/server.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",

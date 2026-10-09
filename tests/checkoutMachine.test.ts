@@ -221,4 +221,68 @@ describe('Checkout State Machine - Axiomatic Invariants', () => {
     actor.send({ type: 'CANCEL_CHECKOUT' });
     assert.strictEqual(actor.getSnapshot().value, 'cart_active');
   });
+
+  test('Axiom 7: Discount code application during checkout_draft recalculates total and is preserved into pending_payment', () => {
+    const actor = createActor(checkoutMachine).start();
+
+    // 1. Cannot apply discount in empty_cart
+    actor.send({ type: 'APPLY_DISCOUNT', code: 'SAVE10', discountCents: 1000 });
+    assert.strictEqual(actor.getSnapshot().value, 'empty_cart');
+    assert.strictEqual(actor.getSnapshot().context.discountCents, 0);
+
+    // 2. Add item -> cart_active
+    actor.send({
+      type: 'ADD_ITEM',
+      item: {
+        productId: 'prod_tee',
+        sku: 'SKU-TEE',
+        title: 'T-Shirt',
+        unitPriceCents: 5000,
+        quantity: 1,
+      },
+    });
+    actor.send({ type: 'INITIATE_CHECKOUT' });
+    assert.strictEqual(actor.getSnapshot().value, 'checkout_draft');
+
+    const subtotal = 5000;
+    const tax = 400; // 8% of 5000
+    assert.strictEqual(actor.getSnapshot().context.subtotalCents, subtotal);
+    assert.strictEqual(actor.getSnapshot().context.totalCents, subtotal + tax);
+
+    // 3. Apply discount $10.00
+    actor.send({ type: 'APPLY_DISCOUNT', code: 'SAVE10', discountCents: 1000 });
+    assert.strictEqual(actor.getSnapshot().context.discountCode, 'SAVE10');
+    assert.strictEqual(actor.getSnapshot().context.discountCents, 1000);
+    // Total without shipping: subtotal (5000) - discount (1000) + tax (400) = 4400
+    assert.strictEqual(actor.getSnapshot().context.totalCents, 4400);
+
+    // 4. Remove discount
+    actor.send({ type: 'REMOVE_DISCOUNT' });
+    assert.strictEqual(actor.getSnapshot().context.discountCode, null);
+    assert.strictEqual(actor.getSnapshot().context.discountCents, 0);
+    assert.strictEqual(actor.getSnapshot().context.totalCents, subtotal + tax);
+
+    // 5. Re-apply discount $20.00
+    actor.send({ type: 'APPLY_DISCOUNT', code: 'SAVE20', discountCents: 2000 });
+    assert.strictEqual(actor.getSnapshot().context.discountCents, 2000);
+    assert.strictEqual(actor.getSnapshot().context.totalCents, 3400);
+
+    // 6. Attach shipping (shipping = $5.00) -> pending_payment
+    actor.send({
+      type: 'ATTACH_SHIPPING',
+      address: {
+        recipientName: 'Alex Doe',
+        addressLine1: '789 Market St',
+        city: 'San Francisco',
+        postalCode: '94103',
+        country: 'USA',
+      },
+      shippingCents: 500,
+    });
+
+    assert.strictEqual(actor.getSnapshot().value, 'pending_payment');
+    // Total with shipping: subtotal (5000) - discount (2000) + shipping (500) + tax (400) = 3900
+    assert.strictEqual(actor.getSnapshot().context.totalCents, 3900);
+    assert.strictEqual(actor.getSnapshot().context.discountCode, 'SAVE20');
+  });
 });

@@ -33,6 +33,8 @@ export interface CheckoutContext {
   subtotalCents: number;
   shippingCents: number;
   taxCents: number;
+  discountCode: string | null;
+  discountCents: number;
   totalCents: number;
   shippingAddress: ShippingAddress | null;
   paymentId: string | null;
@@ -47,6 +49,8 @@ export type CheckoutEvent =
   | { type: 'REMOVE_ITEM'; itemId: string }
   | { type: 'UPDATE_QUANTITY'; itemId: string; quantity: number }
   | { type: 'INITIATE_CHECKOUT' }
+  | { type: 'APPLY_DISCOUNT'; code: string; discountCents: number }
+  | { type: 'REMOVE_DISCOUNT' }
   | { type: 'ATTACH_SHIPPING'; address: ShippingAddress; shippingCents?: number }
   | { type: 'CANCEL_CHECKOUT' }
   | { type: 'SUBMIT_PAYMENT'; idempotencyKey: string; amountCents: number }
@@ -161,10 +165,38 @@ export const checkoutMachine = setup({
         totalCents: subtotal + context.shippingCents + tax,
       };
     }),
+    applyDiscountAction: assign(({ context, event }) => {
+      if (event.type !== 'APPLY_DISCOUNT') return context;
+      const discountCents = Math.min(event.discountCents, context.subtotalCents);
+      const totalCents = Math.max(
+        0,
+        context.subtotalCents - discountCents + context.shippingCents + context.taxCents
+      );
+      return {
+        ...context,
+        discountCode: event.code,
+        discountCents,
+        totalCents,
+      };
+    }),
+    removeDiscountAction: assign(({ context, event }) => {
+      if (event.type !== 'REMOVE_DISCOUNT') return context;
+      const totalCents = context.subtotalCents + context.shippingCents + context.taxCents;
+      return {
+        ...context,
+        discountCode: null,
+        discountCents: 0,
+        totalCents,
+      };
+    }),
     attachShippingAction: assign(({ context, event }) => {
       if (event.type !== 'ATTACH_SHIPPING') return context;
       const shippingCents = event.shippingCents ?? 500; // Default $5.00 standard shipping
-      const totalCents = context.subtotalCents + shippingCents + context.taxCents;
+      const discountCents = context.discountCents ?? 0;
+      const totalCents = Math.max(
+        0,
+        context.subtotalCents - discountCents + shippingCents + context.taxCents
+      );
       return {
         ...context,
         shippingAddress: event.address,
@@ -213,6 +245,8 @@ export const checkoutMachine = setup({
     subtotalCents: 0,
     shippingCents: 0,
     taxCents: 0,
+    discountCode: null,
+    discountCents: 0,
     totalCents: 0,
     shippingAddress: null,
     paymentId: null,
@@ -283,6 +317,12 @@ export const checkoutMachine = setup({
      */
     checkout_draft: {
       on: {
+        APPLY_DISCOUNT: {
+          actions: 'applyDiscountAction',
+        },
+        REMOVE_DISCOUNT: {
+          actions: 'removeDiscountAction',
+        },
         ATTACH_SHIPPING: {
           target: 'pending_payment',
           guard: 'isValidShippingAddress',
