@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useMachine } from '@xstate/react';
 import { checkoutMachine } from '../machines/checkoutMachine';
 
@@ -39,13 +40,58 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
 
   return (
     <main style={{ maxWidth: 860, margin: '40px auto', padding: '0 20px', fontFamily: 'sans-serif' }}>
-      <header style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 20, marginBottom: 24 }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 8px 0' }}>
-          Axioma: Executable Architecture Sandbox
-        </h1>
-        <p style={{ color: '#64748b', margin: 0 }}>
-          Declaratively bounded e-commerce checkout flow governed by XState v5 and GraphQL nouns.
-        </p>
+      <header
+        style={{
+          borderBottom: '1px solid #e2e8f0',
+          paddingBottom: 20,
+          marginBottom: 24,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 8px 0' }}>
+            Axioma: Executable Architecture Sandbox
+          </h1>
+          <p style={{ color: '#64748b', margin: 0 }}>
+            Declaratively bounded e-commerce checkout flow governed by XState v5 and GraphQL nouns.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <Link
+            href="/showcase"
+            style={{
+              padding: '8px 14px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              background: '#047857',
+              color: '#ecfdf5',
+              borderRadius: 6,
+              textDecoration: 'none',
+              border: '1px solid #059669',
+            }}
+          >
+            Showcase Flight Simulator &rarr;
+          </Link>
+          <Link
+            href="/governance"
+            style={{
+              padding: '8px 14px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              background: '#f1f5f9',
+              color: '#334155',
+              borderRadius: 6,
+              textDecoration: 'none',
+              border: '1px solid #cbd5e1',
+            }}
+          >
+            Telemetry &rarr;
+          </Link>
+        </div>
       </header>
 
       {/* State Badge */}

@@ -118,6 +118,22 @@ export default async function GovernanceDashboardPage() {
           >
             &larr; Checkout Sandbox
           </Link>
+          <Link
+            href="/showcase"
+            style={{
+              padding: '8px 14px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              background: '#047857',
+              color: '#ecfdf5',
+              borderRadius: 6,
+              textDecoration: 'none',
+              border: '1px solid #059669',
+            }}
+            className="px-3.5 py-2 text-xs font-semibold bg-emerald-700 text-emerald-50 rounded-md border border-emerald-600 hover:bg-emerald-600"
+          >
+            Showcase Flight Simulator &rarr;
+          </Link>
           <span
             style={{
               padding: '6px 12px',

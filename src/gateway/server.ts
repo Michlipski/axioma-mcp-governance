@@ -17,9 +17,11 @@
 
 import http from 'node:http';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { URL } from 'node:url';
 import { eq } from 'drizzle-orm';
 import { db as defaultDb, schema } from '../db';
+import { AxiomaMCPServer } from '../mcp/server';
 
 export type AuditStatus = 'INTERCEPTED' | 'APPROVED' | 'REJECTED';
 
@@ -136,6 +138,125 @@ export function evaluateVerdict(statusCode: number, jsonRpcResponse: any): Audit
   return 'APPROVED';
 }
 
+const fallbackEngine = new AxiomaMCPServer();
+
+/**
+ * Sanitizes an object before writing to PostgreSQL JSONB to ensure
+ * no null bytes (\u0000) cause SQL execution errors.
+ */
+export function sanitizeForJsonb(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'string') {
+    return obj.replace(/\u0000/g, '');
+  }
+  if (typeof obj === 'object') {
+    if (Array.isArray(obj)) {
+      return obj.map(sanitizeForJsonb);
+    }
+    const clean: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      clean[k] = sanitizeForJsonb(v);
+    }
+    return clean;
+  }
+  return obj;
+}
+
+/**
+ * Executes an MCP request against the Axioma formal state machine engine directly.
+ * Used as a fallback when the upstream port is occupied by a web server (e.g. Next.js).
+ */
+export function executeInternalMcpCall(body: any, engine: AxiomaMCPServer = fallbackEngine): any {
+  if (!body) return null;
+  const { id, method, params } = body;
+
+  if (method === 'tools/call') {
+    const toolName = params?.name;
+    const args = params?.arguments || {};
+
+    if (toolName === 'propose_resolver') {
+      const result = engine.proposeResolver(args);
+      return {
+        jsonrpc: '2.0',
+        id: id ?? null,
+        result: {
+          isError: result.status === 'REJECTED',
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        },
+      };
+    }
+
+    if (toolName === 'introspect_state') {
+      try {
+        const result = engine.introspectStateBoundary(args.stateName);
+        return {
+          jsonrpc: '2.0',
+          id: id ?? null,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          },
+        };
+      } catch (err: any) {
+        return {
+          jsonrpc: '2.0',
+          id: id ?? null,
+          result: {
+            isError: true,
+            content: [{ type: 'text', text: err.message }],
+          },
+        };
+      }
+    }
+  }
+
+  if (method === 'resources/read') {
+    const uri = params?.uri;
+    if (uri === 'axioma://schema/graphql') {
+      return {
+        jsonrpc: '2.0',
+        id: id ?? null,
+        result: {
+          contents: [{ uri, text: engine.getGraphQLSchema(), mimeType: 'text/plain' }],
+        },
+      };
+    }
+    if (uri === 'axioma://machines/checkout') {
+      return {
+        jsonrpc: '2.0',
+        id: id ?? null,
+        result: {
+          contents: [{ uri, text: engine.getStateMachineSource(), mimeType: 'text/plain' }],
+        },
+      };
+    }
+  }
+
+  if (method === 'tools/list') {
+    return {
+      jsonrpc: '2.0',
+      id: id ?? null,
+      result: {
+        tools: [
+          { name: 'introspect_state', description: 'Introspect state boundary' },
+          { name: 'propose_resolver', description: 'Propose resolver implementation' },
+        ],
+      },
+    };
+  }
+
+  return null;
+}
+
 /**
  * Creates the HTTP Gateway Server instance.
  */
@@ -238,6 +359,7 @@ export function handleGatewayRequest(
         ...req.headers,
         host: targetUrl.host,
         'content-length': Buffer.byteLength(rawBody),
+        'accept-encoding': 'identity',
       };
 
       const handleForwardSuccess = async (
@@ -245,18 +367,57 @@ export function handleGatewayRequest(
         headers: http.IncomingHttpHeaders,
         rawResponse: Buffer
       ) => {
-        const responseString = rawResponse.toString('utf-8');
+        // Step 2.1: Decompress if upstream compressed response (e.g. gzip, deflate, br)
+        let uncompressed = rawResponse;
+        const encoding = (headers['content-encoding'] || '').toLowerCase();
+        try {
+          if (encoding.includes('gzip')) {
+            uncompressed = zlib.gunzipSync(rawResponse);
+          } else if (encoding.includes('deflate')) {
+            uncompressed = zlib.inflateSync(rawResponse);
+          } else if (encoding.includes('br')) {
+            uncompressed = zlib.brotliDecompressSync(rawResponse);
+          }
+        } catch {
+          uncompressed = rawResponse;
+        }
+
+        const responseString = uncompressed.toString('utf-8');
         let parsedResponseJson: any = null;
         try {
           if (responseString.trim().length > 0) {
             parsedResponseJson = JSON.parse(responseString);
           }
         } catch {
-          parsedResponseJson = { raw: responseString };
+          parsedResponseJson = null;
         }
 
+        const contentType = (headers['content-type'] || '').toLowerCase();
+        const isHtml = responseString.trim().startsWith('<') || contentType.includes('text/html');
+
+        // Step 2.2: If upstream port is occupied by a web server (e.g. Next.js on port 3000)
+        // rather than the MCP JSON-RPC server, fall back to the internal formal verification engine
+        if ((isHtml || !parsedResponseJson) && parsedPayload?.method) {
+          process.stderr.write(
+            `[MCP Gateway Notice] Upstream at ${targetMcpUrl} returned ${contentType || 'non-JSON'} (detected Next.js / Web Server on port 3000). Resolving via internal Axioma State Machine engine.\n`
+          );
+          const internalResult = executeInternalMcpCall(parsedPayload);
+          if (internalResult) {
+            const internalBytes = Buffer.from(JSON.stringify(internalResult, null, 2));
+            const internalHeaders: http.IncomingHttpHeaders = {
+              'content-type': 'application/json',
+              'content-length': String(internalBytes.length),
+            };
+            return await handleForwardSuccess(200, internalHeaders, internalBytes);
+          }
+        }
+
+        const safeResponseJson = parsedResponseJson || {
+          raw: responseString.slice(0, 500).replace(/[\u0000-\u001F\u007F-\u009F]/g, ''),
+        };
+
         // Step 3: Evaluate state machine / MCP verdict
-        const verdict: AuditStatus = evaluateVerdict(statusCode || 200, parsedResponseJson);
+        const verdict: AuditStatus = evaluateVerdict(statusCode || 200, safeResponseJson);
 
         // Step 4: Update PostgreSQL audit log with final status & response
         try {
@@ -264,7 +425,7 @@ export function handleGatewayRequest(
             .update(schema.agentAuditLogs)
             .set({
               status: verdict,
-              response: parsedResponseJson,
+              response: sanitizeForJsonb(safeResponseJson),
             })
             .where(eq(schema.agentAuditLogs.id, logId));
         } catch (dbErr: any) {
@@ -276,10 +437,11 @@ export function handleGatewayRequest(
         // Step 5: Return exact target response to client unmutated
         const targetHeaders = { ...headers };
         delete targetHeaders['transfer-encoding'];
-        targetHeaders['content-length'] = String(rawResponse.length);
+        delete targetHeaders['content-encoding'];
+        targetHeaders['content-length'] = String(uncompressed.length);
 
         res.writeHead(statusCode || 200, targetHeaders);
-        res.end(rawResponse);
+        res.end(uncompressed);
       };
 
       const handleForwardError = async (fwdErr: any) => {

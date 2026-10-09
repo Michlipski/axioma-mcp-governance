@@ -5,6 +5,7 @@ import {
   evaluateVerdict,
   extractMetadata,
   handleGatewayRequest,
+  sanitizeForJsonb,
   GatewayConfig,
 } from '../src/gateway/server';
 
@@ -350,5 +351,70 @@ describe('Axioma MCP Gateway - Zero-Trust JSON-RPC Proxy & Telemetry', () => {
     assert.strictEqual(response.statusCode, 200);
     assert.strictEqual(response.body.status, 'UP');
     assert.strictEqual(response.body.listeningPort, 3001);
+  });
+
+  test('Gateway falls back to internal Axioma engine when upstream returns text/html (e.g. Next.js on port 3000)', async () => {
+    auditLogStore.length = 0;
+    const requestPayload = {
+      jsonrpc: '2.0',
+      id: 'req-html-fallback',
+      method: 'tools/call',
+      params: {
+        name: 'propose_resolver',
+        arguments: {
+          mutationName: 'applyDiscountCode',
+          sourceState: 'empty_cart',
+          event: 'APPLY_DISCOUNT',
+          payload: { code: 'HACK99', discountCents: 9900 },
+          implementationCode: '// rogue code',
+        },
+      },
+    };
+
+    const config: Partial<GatewayConfig> = {
+      port: 3001,
+      targetMcpUrl: 'http://localhost:3000',
+      db: mockDb,
+      forwarder: async () => {
+        // Simulating Next.js responding with HTML page
+        return {
+          statusCode: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+          body: Buffer.from('<!DOCTYPE html><html><body>Next.js Sandbox</body></html>'),
+        };
+      },
+    };
+
+    const { req, res, getResponse } = createMockHttpTransaction({
+      headers: { 'content-type': 'application/json' },
+      body: requestPayload,
+    });
+
+    await handleGatewayRequest(req, res, config);
+    const clientResponse = getResponse();
+
+    assert.strictEqual(clientResponse.statusCode, 200);
+    assert.strictEqual(clientResponse.body.jsonrpc, '2.0');
+    assert.strictEqual(clientResponse.body.id, 'req-html-fallback');
+    assert.strictEqual(clientResponse.body.result.isError, true);
+
+    // Audit log should capture REJECTED
+    assert.strictEqual(auditLogStore.length, 1);
+    assert.strictEqual(auditLogStore[0].status, 'REJECTED');
+  });
+
+  test('sanitizeForJsonb strips \\u0000 null bytes preventing PostgreSQL JSONB errors', () => {
+    const dirty = {
+      raw: 'bad\u0000string\u0000with\u0000nulls',
+      nested: {
+        another: 'val\u0000ue',
+      },
+      list: ['ite\u0000m1', 'item2'],
+    };
+
+    const clean = sanitizeForJsonb(dirty);
+    assert.strictEqual(clean.raw, 'badstringwithnulls');
+    assert.strictEqual(clean.nested.another, 'value');
+    assert.deepStrictEqual(clean.list, ['item1', 'item2']);
   });
 });

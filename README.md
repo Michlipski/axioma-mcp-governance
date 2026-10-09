@@ -2,10 +2,26 @@
 
 > **Axioma** is an executable architectural framework that physically boxes in autonomous AI coding agents using formal visual state graphs (XState v5), rigid API schemas (GraphQL), and active governance protocols (Model Context Protocol / MCP).
 
-[![Node Test Suite](https://img.shields.io/badge/tests-25%20passed-brightgreen.svg)]()
-[![MCP Compliant](https://img.shields.io/badge/MCP-1.0-blue.svg)]()
+[![Node Test Suite](https://img.shields.io/badge/tests-42%20passed-brightgreen.svg)]()
+[![Flight Simulator](https://img.shields.io/badge/Flight%20Simulator-%2Fshowcase-059669.svg)]()
+[![MCP Gateway](https://img.shields.io/badge/MCP%20Gateway-Port%203001-2563eb.svg)]()
+[![Core MCP](https://img.shields.io/badge/Core%20MCP-Port%203000-7c3aed.svg)]()
 [![XState](https://img.shields.io/badge/XState-v5-purple.svg)]()
 [![GraphQL](https://img.shields.io/badge/GraphQL-Strict%20Types-e10098.svg)]()
+
+---
+
+## Interactive Showcase: The Governance Flight Simulator
+
+Axioma includes a developer-focused control plane at **[`/showcase`](http://localhost:3000/showcase)** acting as a "Flight Simulator" for system architects to test deterministic LLM governance:
+
+* **Topology & Active State Boundary Viewer:** Live visual inspection of the finite state machine (`empty_cart`, `checkout_draft`, `pending_payment`, `paid`), explicitly displaying legal transitions versus mathematically forbidden actions.
+* **Agent Intent Dispatcher:** Interactive scenario triggers sending JSON-RPC proposals directly through the Zero-Trust Gateway on port `3001`:
+  1. *Rogue Agent: Attempt Discount on Empty Cart* &rarr; **`REJECTED`** (`ILLEGAL_STATE_TRANSITION`)
+  2. *Compliant Agent: Execute Legal Payment* &rarr; **`APPROVED`** (Advances to `payment_processing`)
+  3. *Rogue Agent: Submit Payment Without Idempotency Key* &rarr; **`REJECTED`** (`MISSING_IDEMPOTENCY_KEY`)
+* **Live Audit Stream:** Real-time stream of `agent_audit_logs` from PostgreSQL with status chips (`INTERCEPTED`, `APPROVED`, `REJECTED`) and expandable JSON inspection drawers.
+* **Declarative Scenarios Directory:** Reproducible fixtures under [`showcase/scenarios/`](./showcase/scenarios/) with a 2-minute architectural brief in [`showcase/README.md`](./showcase/README.md).
 
 ---
 
@@ -20,12 +36,30 @@ When LLMs are given direct database access or generic system prompts, they frequ
 Instead of letting the AI guess the architecture, **the architecture governs the AI.**
 
 ```mermaid
-flowchart LR
-    A["XState State Machine\n(Governs WHEN)"] --> C["Axioma MCP Server\n(The Lens & Governor)"]
-    B["GraphQL Schema\n(Governs WHAT)"] --> C
-    C --> D["Antigravity Subagent\n(Zero-Trust Generator)"]
-    D --> E["propose_resolver Tool\n(Formal Verification)"]
-    E --> F["PostgreSQL / Drizzle Mutation\n(Deterministic Backend)"]
+flowchart TD
+    subgraph Agents["Autonomous AI Agents (Probabilistic)"]
+        AGENT["LLM Subagent\n(Synthesizes code / proposals)"]
+    end
+
+    subgraph Gateway["Zero-Trust MCP Gateway (:3001)"]
+        PROXY["JSON-RPC Proxy & Interceptor"]
+        LEDGER[("PostgreSQL\nagent_audit_logs")]
+    end
+
+    subgraph Governance["Axioma Core MCP Server (:3000)"]
+        XSTATE["XState State Machine\n(Governs WHEN - Temporal Logic)"]
+        GRAPHQL["GraphQL Schema\n(Governs WHAT - Data Nouns)"]
+        VERIFY["propose_resolver Tool\n(Formal Mathematical Verification)"]
+    end
+
+    AGENT -->|"tools/call"| PROXY
+    PROXY -->|"1. Log INTERCEPTED"| LEDGER
+    PROXY -->|"2. Forward unmutated"| VERIFY
+    VERIFY --> XSTATE
+    VERIFY --> GRAPHQL
+    VERIFY -->|"3. Verification verdict"| PROXY
+    PROXY -->|"4. Update APPROVED / REJECTED"| LEDGER
+    PROXY -->|"5. Return verdict"| AGENT
 ```
 
 ---
@@ -189,16 +223,18 @@ async submitPayment(_: unknown, { orderId, input }: { orderId: string; input: Pa
 
 ---
 
-## Negative Proofs: What Happens When an AI Violates Boundaries?
+## Negative Proofs & Showcase Scenarios: What Happens When an AI Violates Boundaries?
 
-To prove the governance system is active rather than advisory, the test suite verifies rejection of invalid proposals:
+To prove the governance system is active rather than advisory, the test suite and showcase simulator verify strict rejection of invalid proposals:
 
-| Violation Scenario | Attempted Action | MCP Governance Verdict |
+| Scenario Fixture | Attempted Action | MCP Governance Verdict |
 | :--- | :--- | :--- |
+| [**01-illegal-discount-on-empty-cart.json**](./showcase/scenarios/01-illegal-discount-on-empty-cart.json) | Triggering `APPLY_DISCOUNT` from `empty_cart` | `REJECTED`: `ILLEGAL_STATE_TRANSITION`<br>*"In state 'empty_cart', triggering 'APPLY_DISCOUNT' is mathematically impossible."* |
+| [**03-missing-idempotency-key.json**](./showcase/scenarios/03-missing-idempotency-key.json) | Omitting `idempotencyKey` from payment payload | `REJECTED`: `MISSING_IDEMPOTENCY_KEY`<br>*"Payload must provide a non-empty string idempotencyKey"* |
 | **Out-of-Order Transition** | Triggering `SUBMIT_PAYMENT` from `empty_cart` | `REJECTED`: `ILLEGAL_STATE_TRANSITION`<br>*"Event 'SUBMIT_PAYMENT' is not admissible from state 'empty_cart'"* |
-| **Missing Idempotency Key** | Omitting `idempotencyKey` from payment payload | `REJECTED`: `MISSING_IDEMPOTENCY_KEY`<br>*"Payload must provide a non-empty string idempotencyKey"* |
 | **Financial Under/Overcharge** | Submitting `amountCents` mismatching `totalCents` | `REJECTED`: `INVALID_AMOUNT`<br>*"amountCents must be a positive integer matching totalCents"* |
 | **Hallucinated Mutation** | Proposing `arbitraryDirectBypass` | `REJECTED`: `GRAPHQL_MUTATION_NOT_FOUND`<br>*"Mutation does not exist in schema.graphql"* |
+| [**02-valid-checkout-and-payment.json**](./showcase/scenarios/02-valid-checkout-and-payment.json) | Compliant payment with idempotency & exact amount | `APPROVED`<br>*"Legal transition from 'pending_payment' to 'payment_processing'."* |
 
 ---
 
@@ -206,21 +242,36 @@ To prove the governance system is active rather than advisory, the test suite ve
 
 ```
 axioma/
+├── showcase/
+│   ├── README.md                 # 2-minute showcase architectural brief
+│   └── scenarios/
+│       ├── 01-illegal-discount-on-empty-cart.json  # Rogue agent empty cart discount fixture
+│       ├── 02-valid-checkout-and-payment.json      # Compliant agent payment fixture
+│       └── 03-missing-idempotency-key.json         # Guard failure fixture
 ├── src/
+│   ├── app/
+│   │   ├── showcase/page.tsx     # Governance Flight Simulator control plane
+│   │   ├── governance/page.tsx   # Live PostgreSQL telemetry dashboard
+│   │   ├── api/audit-logs/       # Audit feed API route (Drizzle ORM)
+│   │   ├── api/graphql/          # Apollo GraphQL server route
+│   │   └── page.tsx              # Interactive checkout sandbox
+│   ├── gateway/
+│   │   └── server.ts             # Zero-Trust MCP Gateway proxy (:3001 -> :3000)
+│   ├── machines/
+│   │   └── checkoutMachine.ts    # Formal XState v5 checkout finite state machine
 │   ├── graphql/
 │   │   ├── schema.graphql        # Rigid GraphQL nouns & mutations
 │   │   └── resolvers.ts          # State-machine projected resolvers
-│   ├── machines/
-│   │   └── checkoutMachine.ts    # Formal XState v5 checkout finite state machine
 │   ├── mcp/
 │   │   ├── server.ts             # Model Context Protocol server, tools, & resources
-│   │   └── index.ts              # Executable stdio MCP daemon
+│   │   ├── http.ts               # Core MCP HTTP server (:3000)
+│   │   └── index.ts              # MCP stdio executable daemon
 │   └── db/
-│       ├── schema.ts             # Drizzle ORM PostgreSQL schema
-│       └── index.ts              # Database connection
-├── scripts/
-│   └── mcp-query.ts              # CLI interpreter for subagents to query MCP
+│       ├── schema.ts             # PostgreSQL tables: carts, orders, agent_audit_logs
+│       └── index.ts              # Drizzle ORM connection pool
 ├── tests/
+│   ├── showcase.test.ts          # Showcase fixtures & invariant verification
+│   ├── gateway.test.ts           # Gateway proxy, decompression, & telemetry tests
 │   ├── checkoutMachine.test.ts   # Formal state machine mathematical invariant tests
 │   ├── mcp.test.ts               # MCP server resources, tools, and proposal validation
 │   └── resolvers.test.ts         # Apollo Server zero-trust execution tests
@@ -230,19 +281,33 @@ axioma/
 
 ---
 
-## Quickstart & Verification
+## Quickstart & Flight Simulator
 
 ### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-### 2. Run the Full Test Suite (25 Tests)
+### 2. Run the Full Test Suite (42 Tests)
 ```bash
 npm test
 ```
 
-### 3. Query the MCP Server via CLI
+### 3. Launch the Governance Flight Simulator
+```bash
+# Terminal 1: Core MCP HTTP Server (Port 3000)
+npm run mcp:server
+
+# Terminal 2: Zero-Trust MCP Gateway Proxy (Port 3001)
+npm run mcp:gateway
+
+# Terminal 3: Next.js Showcase Control Plane
+npm run dev
+```
+
+Navigate to **`http://localhost:3000/showcase`** in your browser to test live scenario dispatches against the Gateway proxy!
+
+### 4. Query the MCP Server via CLI
 ```bash
 # Introspect state boundary
 npx tsx scripts/mcp-query.ts introspect pending_payment
@@ -251,12 +316,7 @@ npx tsx scripts/mcp-query.ts introspect pending_payment
 npx tsx scripts/mcp-query.ts resource schema
 
 # Validate a proposal
-npx tsx scripts/mcp-query.ts propose scratch/proposal.json
-```
-
-### 4. Run the Standalone MCP Server over stdio
-```bash
-npm run mcp:server
+npx tsx scripts/mcp-query.ts propose showcase/scenarios/02-valid-checkout-and-payment.json
 ```
 
 ---
