@@ -1,0 +1,191 @@
+"""
+GraphQL Nouns Schema - Axioma Executable Architecture
+Generated strictly from Phase 0 Trace Specifications:
+- trace/domains/cart.domain.md
+- trace/domains/order.domain.md
+- trace/domains/payment.domain.md
+- trace/domains/fulfillment.domain.md
+"""
+
+scalar DateTime
+
+enum CartStatus {
+  ACTIVE
+  LOCKED_FOR_CHECKOUT
+  CONVERTED
+  ABANDONED
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_SHIPPING
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  FULFILLED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum FulfillmentStatus {
+  QUEUED
+  PACKING
+  SHIPPED
+  DELIVERED
+}
+
+# --- Cart Domain (cart.domain.md) ---
+
+type CartItem {
+  id: ID!
+  cartId: ID!
+  productId: ID!
+  sku: String!
+  title: String!
+  unitPriceCents: Int!
+  quantity: Int!
+  totalCents: Int!
+}
+
+type Cart {
+  id: ID!
+  customerId: ID
+  status: CartStatus!
+  items: [CartItem!]!
+  itemCount: Int!
+  subtotalCents: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# --- Order Domain (order.domain.md) ---
+
+type OrderLineItem {
+  id: ID!
+  orderId: ID!
+  productId: ID!
+  sku: String!
+  title: String!
+  unitPriceCents: Int!
+  quantity: Int!
+  totalCents: Int!
+}
+
+type ShippingAddress {
+  id: ID!
+  orderId: ID!
+  recipientName: String!
+  addressLine1: String!
+  city: String!
+  postalCode: String!
+  country: String!
+}
+
+type Order {
+  id: ID!
+  orderNumber: String!
+  customerId: ID
+  cartId: ID!
+  status: OrderStatus!
+  lineItems: [OrderLineItem!]!
+  shippingAddress: ShippingAddress
+  subtotalCents: Int!
+  shippingCents: Int!
+  taxCents: Int!
+  totalCents: Int!
+  createdAt: DateTime!
+}
+
+# --- Payment Domain (payment.domain.md) ---
+
+type PaymentTransaction {
+  id: ID!
+  orderId: ID!
+  idempotencyKey: String!
+  amountCents: Int!
+  currency: String!
+  status: PaymentStatus!
+  gatewayReference: String
+  errorMessage: String
+  createdAt: DateTime!
+}
+
+type PaymentResult {
+  success: Boolean!
+  transaction: PaymentTransaction!
+  order: Order!
+}
+
+# --- Fulfillment Domain (fulfillment.domain.md) ---
+
+type FulfillmentJob {
+  id: ID!
+  orderId: ID!
+  status: FulfillmentStatus!
+  trackingNumber: String
+  carrier: String
+  dispatchedAt: DateTime
+  createdAt: DateTime!
+}
+
+# --- Queries ---
+
+type Query {
+  cart(id: ID!): Cart
+  order(id: ID!): Order
+  paymentTransaction(id: ID!): PaymentTransaction
+  fulfillmentJob(orderId: ID!): FulfillmentJob
+}
+
+# --- Inputs ---
+
+input AddItemInput {
+  productId: ID!
+  sku: String!
+  title: String!
+  unitPriceCents: Int!
+  quantity: Int!
+}
+
+input ShippingAddressInput {
+  recipientName: String!
+  addressLine1: String!
+  city: String!
+  postalCode: String!
+  country: String!
+}
+
+input PaymentInput {
+  idempotencyKey: String!
+  paymentToken: String!
+  amountCents: Int!
+  currency: String
+}
+
+# --- Mutations (Strictly Governed by XState Transitions) ---
+
+type Mutation {
+  createCart(customerId: ID): Cart!
+  addItemToCart(cartId: ID!, input: AddItemInput!): Cart!
+  removeItemFromCart(cartId: ID!, cartItemId: ID!): Cart!
+  updateCartItemQuantity(cartId: ID!, cartItemId: ID!, quantity: Int!): Cart!
+
+  # Transition: ACTIVE -> LOCKED_FOR_CHECKOUT (Draft Order created)
+  initiateCheckout(cartId: ID!): Order!
+
+  # Transition: DRAFT -> PENDING_PAYMENT
+  attachShippingAddress(orderId: ID!, input: ShippingAddressInput!): Order!
+
+  # Transition: PENDING_PAYMENT -> PAYMENT_PROCESSING -> PAID (Idempotent)
+  submitPayment(orderId: ID!, input: PaymentInput!): PaymentResult!
+
+  # Transition: PAID -> FULFILLED
+  dispatchFulfillment(orderId: ID!, trackingNumber: String!, carrier: String!): FulfillmentJob!
+}
