@@ -22,6 +22,13 @@
       "when": 1791578066996,
       "tag": "0002_order_discount_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791590000000,
+      "tag": "0003_agent_audit_logs_domain",
+      "breakpoints": true
     }
   ]
 }

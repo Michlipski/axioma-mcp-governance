@@ -4,7 +4,7 @@
  */
 
 import http from 'node:http';
-import { AxiomaMCPServer } from './server';
+import { AxiomaMCPServer, DomainName } from './server';
 
 export function createMcpHttpServer(port: number = 3000): http.Server {
   const axioma = new AxiomaMCPServer();
@@ -22,15 +22,27 @@ export function createMcpHttpServer(port: number = 3000): http.Server {
     req.on('data', (c) => chunks.push(c));
     req.on('end', () => {
       try {
-        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+        const raw = Buffer.concat(chunks).toString('utf-8');
+        if (!raw.trim()) {
+          res.writeHead(200);
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: null, result: { status: 'acknowledged' } }));
+          return;
+        }
+
+        const body = JSON.parse(raw);
         const { id, method, params } = body;
+        const domainHeader = (req.headers['x-domain'] || req.headers['domain']) as DomainName | undefined;
 
         if (method === 'tools/call') {
           const toolName = params?.name;
           const args = params?.arguments || {};
+          const domain = args.domain || domainHeader;
 
           if (toolName === 'propose_resolver') {
-            const result = axioma.proposeResolver(args);
+            const result = axioma.proposeResolver({
+              ...args,
+              domain: domain || args.domain,
+            });
             res.writeHead(200);
             res.end(
               JSON.stringify({
@@ -52,7 +64,7 @@ export function createMcpHttpServer(port: number = 3000): http.Server {
 
           if (toolName === 'introspect_state') {
             try {
-              const result = axioma.introspectStateBoundary(args.stateName);
+              const result = axioma.introspectStateBoundary(args.stateName, domain);
               res.writeHead(200);
               res.end(
                 JSON.stringify({
@@ -87,27 +99,70 @@ export function createMcpHttpServer(port: number = 3000): http.Server {
 
         if (method === 'resources/read') {
           const uri = params?.uri;
-          if (uri === 'axioma://schema/graphql') {
+
+          // Fulfillment Domain Resources
+          if (uri === 'axioma://domains/fulfillment/schema') {
             res.writeHead(200);
             res.end(
               JSON.stringify({
                 jsonrpc: '2.0',
                 id,
                 result: {
-                  contents: [{ uri, text: axioma.getGraphQLSchema(), mimeType: 'text/plain' }],
+                  contents: [{ uri, text: axioma.getGraphQLSchema('fulfillment'), mimeType: 'text/plain' }],
                 },
               })
             );
             return;
           }
-          if (uri === 'axioma://machines/checkout') {
+          if (uri === 'axioma://domains/fulfillment/state') {
             res.writeHead(200);
             res.end(
               JSON.stringify({
                 jsonrpc: '2.0',
                 id,
                 result: {
-                  contents: [{ uri, text: axioma.getStateMachineSource(), mimeType: 'text/plain' }],
+                  contents: [{ uri, text: axioma.getStateMachineSource('fulfillment'), mimeType: 'text/plain' }],
+                },
+              })
+            );
+            return;
+          }
+
+          // Checkout Domain Resources
+          if (uri === 'axioma://domains/checkout/schema' || uri === 'axioma://schema/graphql') {
+            res.writeHead(200);
+            res.end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  contents: [{ uri, text: axioma.getGraphQLSchema('checkout'), mimeType: 'text/plain' }],
+                },
+              })
+            );
+            return;
+          }
+          if (uri === 'axioma://domains/checkout/state' || uri === 'axioma://machines/checkout') {
+            res.writeHead(200);
+            res.end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  contents: [{ uri, text: axioma.getStateMachineSource('checkout'), mimeType: 'text/plain' }],
+                },
+              })
+            );
+            return;
+          }
+          if (uri === 'axioma://machines/json') {
+            res.writeHead(200);
+            res.end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  contents: [{ uri, text: JSON.stringify(axioma.getStateMachineJSON('checkout'), null, 2), mimeType: 'application/json' }],
                 },
               })
             );

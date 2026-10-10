@@ -2,6 +2,14 @@
  * Axioma Architecture MCP Server
  * Exposes GraphQL schema, PostgreSQL DDL, and XState state boundaries
  * to specialized child subagents for zero-trust code generation.
+ *
+ * Supports Domain Routing & Least-Privilege Isolation:
+ * - Domain: 'checkout' | 'fulfillment'
+ * - Resource URIs:
+ *   - axioma://domains/checkout/schema
+ *   - axioma://domains/checkout/state
+ *   - axioma://domains/fulfillment/schema
+ *   - axioma://domains/fulfillment/state
  */
 
 import fs from 'node:fs';
@@ -9,8 +17,12 @@ import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { checkoutMachine } from '../machines/checkoutMachine';
+import { fulfillmentMachine } from '../machines/fulfillmentMachine';
+
+export type DomainName = 'checkout' | 'fulfillment';
 
 export interface MCPIntrospectionResponse {
+  domain: DomainName;
   state: string;
   admissibleEvents: string[];
   invariants: string[];
@@ -18,6 +30,7 @@ export interface MCPIntrospectionResponse {
 }
 
 export interface ProposeResolverInput {
+  domain?: DomainName;
   mutationName: string;
   sourceState: string;
   event: string;
@@ -27,6 +40,7 @@ export interface ProposeResolverInput {
 
 export interface ProposeResolverResult {
   status: 'APPROVED' | 'REJECTED';
+  domain?: DomainName;
   sourceState: string;
   targetState?: string;
   error?: string;
@@ -36,42 +50,56 @@ export interface ProposeResolverResult {
 }
 
 export class AxiomaMCPServer {
-  private schemaPath: string;
-  private machinePath: string;
+  private baseDir: string;
+  private defaultDomain: DomainName;
+  private schemaPaths: Record<DomainName, string>;
+  private machinePaths: Record<DomainName, string>;
   private traceDir: string;
 
-  constructor(baseDir: string = process.cwd()) {
-    this.schemaPath = path.join(baseDir, 'src/graphql/schema.graphql');
-    this.machinePath = path.join(baseDir, 'src/machines/checkoutMachine.ts');
+  constructor(baseDir: string = process.cwd(), defaultDomain: DomainName = 'checkout') {
+    this.baseDir = baseDir;
+    this.defaultDomain = defaultDomain;
+    this.schemaPaths = {
+      checkout: path.join(baseDir, 'src/graphql/schema.graphql'),
+      fulfillment: path.join(baseDir, 'src/graphql/schema.fulfillment.graphql'),
+    };
+    this.machinePaths = {
+      checkout: path.join(baseDir, 'src/machines/checkoutMachine.ts'),
+      fulfillment: path.join(baseDir, 'src/machines/fulfillmentMachine.ts'),
+    };
     this.traceDir = path.join(baseDir, 'docs/trace');
   }
 
   /**
-   * Resource: Read the current GraphQL Nouns Schema
+   * Resource: Read GraphQL Nouns Schema for a given domain
    */
-  public getGraphQLSchema(): string {
-    if (!fs.existsSync(this.schemaPath)) {
-      throw new Error(`Schema file not found at: ${this.schemaPath}`);
+  public getGraphQLSchema(domain: DomainName = 'checkout'): string {
+    const p = this.schemaPaths[domain] || this.schemaPaths.checkout;
+    if (!fs.existsSync(p)) {
+      throw new Error(`Schema file not found for domain '${domain}' at: ${p}`);
     }
-    return fs.readFileSync(this.schemaPath, 'utf-8');
+    return fs.readFileSync(p, 'utf-8');
   }
 
   /**
-   * Resource: Read the raw XState Machine source code
+   * Resource: Read the raw XState Machine source code for a given domain
    */
-  public getStateMachineSource(): string {
-    if (!fs.existsSync(this.machinePath)) {
-      throw new Error(`Machine source file not found at: ${this.machinePath}`);
+  public getStateMachineSource(domain: DomainName = 'checkout'): string {
+    const p = this.machinePaths[domain] || this.machinePaths.checkout;
+    if (!fs.existsSync(p)) {
+      throw new Error(`Machine source file not found for domain '${domain}' at: ${p}`);
     }
-    return fs.readFileSync(this.machinePath, 'utf-8');
+    return fs.readFileSync(p, 'utf-8');
   }
 
   /**
-   * Resource: Get XState Machine Definition as JSON
+   * Resource: Get XState Machine Definition as JSON for a given domain
    */
-  public getStateMachineJSON(): Record<string, unknown> {
-    const rawConfig = checkoutMachine.config;
+  public getStateMachineJSON(domain: DomainName = 'checkout'): Record<string, unknown> {
+    const machine = domain === 'fulfillment' ? fulfillmentMachine : checkoutMachine;
+    const rawConfig = machine.config;
     return {
+      domain,
       id: rawConfig.id,
       initial: rawConfig.initial,
       states: Object.keys(rawConfig.states || {}).reduce<Record<string, unknown>>((acc, stateKey) => {
@@ -85,16 +113,118 @@ export class AxiomaMCPServer {
     };
   }
 
+  private isFulfillmentState(stateName: string): boolean {
+    return ['unfulfilled', 'inventory_allocated', 'label_printed', 'in_transit'].includes(stateName);
+  }
+
+  private isCheckoutState(stateName: string): boolean {
+    return [
+      'empty_cart',
+      'cart_active',
+      'checkout_draft',
+      'pending_payment',
+      'payment_processing',
+      'payment_failed',
+      'paid',
+      'fulfilled',
+    ].includes(stateName);
+  }
+
+  private isCheckoutMutation(mutationName: string): boolean {
+    return [
+      'createCart',
+      'addItemToCart',
+      'removeItemFromCart',
+      'updateCartItemQuantity',
+      'initiateCheckout',
+      'applyDiscountCode',
+      'removeDiscountCode',
+      'attachShippingAddress',
+      'submitPayment',
+      'dispatchFulfillment',
+    ].includes(mutationName);
+  }
+
+  private isFulfillmentMutation(mutationName: string): boolean {
+    return ['allocateInventory', 'printShippingLabel', 'dispatchShipment'].includes(mutationName);
+  }
+
+  private isCheckoutEvent(event: string): boolean {
+    return [
+      'ADD_ITEM',
+      'REMOVE_ITEM',
+      'UPDATE_QUANTITY',
+      'INITIATE_CHECKOUT',
+      'APPLY_DISCOUNT',
+      'REMOVE_DISCOUNT',
+      'ATTACH_SHIPPING',
+      'SUBMIT_PAYMENT',
+      'PAYMENT_SUCCESS',
+      'PAYMENT_ERROR',
+      'RETRY_PAYMENT',
+      'CANCEL_CHECKOUT',
+      'DISPATCH_FULFILLMENT',
+    ].includes(event);
+  }
+
+  private isFulfillmentEvent(event: string): boolean {
+    return ['ALLOCATE_INVENTORY', 'PRINT_LABEL', 'DISPATCH_SHIPMENT', 'CANCEL_FULFILLMENT'].includes(event);
+  }
+
   /**
    * Tool: Introspect State Boundary
    * Queries what events and guards are legal from a specific state.
    */
-  public introspectStateBoundary(stateName: string): MCPIntrospectionResponse {
+  public introspectStateBoundary(stateName: string, explicitDomain?: DomainName): MCPIntrospectionResponse {
+    const domain: DomainName =
+      explicitDomain ||
+      (this.isFulfillmentState(stateName) ? 'fulfillment' : 'checkout');
+
+    if (domain === 'fulfillment') {
+      const machineConfig = fulfillmentMachine.config;
+      const stateDef = machineConfig.states?.[stateName];
+
+      if (!stateDef) {
+        throw new Error(
+          `Invalid fulfillment state: ${stateName}. Admissible states: ${Object.keys(machineConfig.states || {}).join(', ')}`
+        );
+      }
+
+      const admissibleEvents = stateDef.on ? Object.keys(stateDef.on) : [];
+      const invariants: string[] = [];
+
+      if (stateName === 'unfulfilled') {
+        invariants.push('Initial fulfillment state awaiting inventory allocation.');
+        invariants.push('ALLOCATE_INVENTORY is the only admissible transition.');
+        invariants.push('SUBMIT_PAYMENT is cross-domain and mathematically illegal.');
+      } else if (stateName === 'inventory_allocated') {
+        invariants.push('Stock is reserved in warehouse.');
+        invariants.push('PRINT_LABEL requires valid carrier.');
+        invariants.push('CANCEL_FULFILLMENT reverts to unfulfilled.');
+      } else if (stateName === 'label_printed') {
+        invariants.push('Shipping label generated and package queued for carrier.');
+        invariants.push('DISPATCH_SHIPMENT requires valid tracking number.');
+      } else if (stateName === 'in_transit') {
+        invariants.push('Terminal state. Package is in custody of logistics carrier.');
+      }
+
+      return {
+        domain: 'fulfillment',
+        state: stateName,
+        admissibleEvents,
+        invariants,
+        subgraph: this.extractSubgraphForState(stateName, 'fulfillment'),
+      };
+    }
+
+    // Default: checkout domain
     const machineConfig = checkoutMachine.config;
     const stateDef = machineConfig.states?.[stateName];
 
     if (!stateDef) {
-      throw new Error(`Invalid state: ${stateName}. Admissible states: ${Object.keys(machineConfig.states || {}).join(', ')}`);
+      throw new Error(
+        `Invalid state: ${stateName}. Admissible states: ${Object.keys(machineConfig.states || {}).join(', ')}`
+      );
     }
 
     const admissibleEvents = stateDef.on ? Object.keys(stateDef.on) : [];
@@ -127,21 +257,174 @@ export class AxiomaMCPServer {
     }
 
     return {
+      domain: 'checkout',
       state: stateName,
       admissibleEvents,
       invariants,
-      subgraph: this.extractSubgraphForState(stateName),
+      subgraph: this.extractSubgraphForState(stateName, 'checkout'),
     };
   }
 
   /**
    * Tool: Propose Resolver
    * Validates whether a proposed resolver implementation conforms to:
-   * 1. XState legal transitions and guards
-   * 2. GraphQL schema nouns & mutation signatures
-   * 3. Database mutation constraints (e.g. idempotency, order status updates)
+   * 1. Least-Privilege Domain Isolation boundaries
+   * 2. XState legal transitions and guards for the target domain
+   * 3. GraphQL schema nouns & mutation signatures for the target domain
+   * 4. Database mutation constraints (e.g. idempotency, status updates)
    */
   public proposeResolver(input: ProposeResolverInput): ProposeResolverResult {
+    const { mutationName, sourceState, event, payload, implementationCode } = input;
+    const domain: DomainName =
+      input.domain ||
+      (payload?._meta?.domain as DomainName) ||
+      (payload?.domain as DomainName) ||
+      (this.isFulfillmentState(sourceState) || this.isFulfillmentEvent(event) ? 'fulfillment' : this.defaultDomain);
+
+    // 1. Cross-Domain Isolation Enforcement
+    if (domain === 'fulfillment') {
+      const attemptsCheckoutMutation = this.isCheckoutMutation(mutationName);
+      const attemptsCheckoutEvent = this.isCheckoutEvent(event);
+      const attemptsCheckoutState = this.isCheckoutState(sourceState);
+
+      if (attemptsCheckoutMutation || attemptsCheckoutEvent || attemptsCheckoutState) {
+        return {
+          status: 'REJECTED',
+          domain: 'fulfillment',
+          sourceState,
+          error: `Domain boundary violation: Agent operating in domain 'fulfillment' cannot execute checkout operation '${mutationName || event}'. Cross-domain tool calls are strictly forbidden under least-privilege governance.`,
+          violations: ['DOMAIN_BOUNDARY_VIOLATION'],
+          feedback: `DOMAIN_BOUNDARY_VIOLATION: The agent operating under 'fulfillment' least-privilege context attempted to execute '${mutationName || event}', which belongs to domain 'checkout'.`,
+        };
+      }
+      return this.validateFulfillmentProposal(input);
+    }
+
+    if (domain === 'checkout') {
+      const attemptsFulfillmentMutation = this.isFulfillmentMutation(mutationName);
+      const attemptsFulfillmentEvent = this.isFulfillmentEvent(event) && event !== 'DISPATCH_FULFILLMENT';
+      const attemptsFulfillmentState = this.isFulfillmentState(sourceState) && sourceState !== 'fulfilled';
+
+      if (attemptsFulfillmentMutation || attemptsFulfillmentEvent || attemptsFulfillmentState) {
+        return {
+          status: 'REJECTED',
+          domain: 'checkout',
+          sourceState,
+          error: `Domain boundary violation: Agent operating in domain 'checkout' cannot execute fulfillment operation '${mutationName || event}'.`,
+          violations: ['DOMAIN_BOUNDARY_VIOLATION'],
+          feedback: `DOMAIN_BOUNDARY_VIOLATION: Cross-domain call into fulfillment is forbidden for checkout agent.`,
+        };
+      }
+      return this.validateCheckoutProposal(input);
+    }
+
+    return this.validateCheckoutProposal(input);
+  }
+
+  private validateFulfillmentProposal(input: ProposeResolverInput): ProposeResolverResult {
+    const { mutationName, sourceState, event, payload } = input;
+    const machineConfig = fulfillmentMachine.config;
+    const stateDef = machineConfig.states?.[sourceState];
+
+    if (!stateDef) {
+      return {
+        status: 'REJECTED',
+        domain: 'fulfillment',
+        sourceState,
+        error: `State '${sourceState}' does not exist in fulfillmentMachine. Admissible states: ${Object.keys(machineConfig.states || {}).join(', ')}`,
+        violations: ['UNKNOWN_SOURCE_STATE'],
+        feedback: 'The agent attempted to transition from a non-existent state in the fulfillment domain.',
+      };
+    }
+
+    const admissibleEvents = stateDef.on ? Object.keys(stateDef.on) : [];
+    if (!admissibleEvents.includes(event)) {
+      return {
+        status: 'REJECTED',
+        domain: 'fulfillment',
+        sourceState,
+        error: `Transition violation: Event '${event}' is not admissible from state '${sourceState}'. Legal events: [${admissibleEvents.join(', ')}]`,
+        violations: ['ILLEGAL_STATE_TRANSITION'],
+        feedback: `In fulfillment state '${sourceState}', triggering '${event}' is illegal. Admissible events: [${admissibleEvents.join(', ')}]`,
+      };
+    }
+
+    const schema = this.getGraphQLSchema('fulfillment');
+    const mutationRegex = new RegExp(`\\b${mutationName}\\s*\\(`, 'm');
+    if (!mutationRegex.test(schema)) {
+      return {
+        status: 'REJECTED',
+        domain: 'fulfillment',
+        sourceState,
+        error: `Schema violation: Mutation '${mutationName}' does not exist in schema.fulfillment.graphql.`,
+        violations: ['GRAPHQL_MUTATION_NOT_FOUND'],
+        feedback: `The agent proposed a mutation name '${mutationName}' that does not exist in the fulfillment GraphQL schema.`,
+      };
+    }
+
+    const violations: string[] = [];
+    const validatedGuards: string[] = [];
+    let targetState = '';
+
+    if (event === 'ALLOCATE_INVENTORY') {
+      const orderId = payload?.orderId || payload?.input?.orderId;
+      if (!orderId || typeof orderId !== 'string' || !orderId.trim()) {
+        violations.push('MISSING_ORDER_ID: orderId is required to allocate inventory.');
+      } else {
+        validatedGuards.push('hasOrderId');
+      }
+
+      const items = payload?.items || payload?.input?.items;
+      if (items && Array.isArray(items) && items.length === 0) {
+        violations.push('EMPTY_ITEMS: cannot allocate inventory with 0 items.');
+      } else {
+        validatedGuards.push('hasItems');
+      }
+
+      targetState = 'inventory_allocated';
+    } else if (event === 'PRINT_LABEL') {
+      const carrier = payload?.carrier || payload?.input?.carrier;
+      if (!carrier || typeof carrier !== 'string' || !carrier.trim()) {
+        violations.push('MISSING_CARRIER: carrier is required to generate shipping label.');
+      } else {
+        validatedGuards.push('hasValidCarrier');
+      }
+      targetState = 'label_printed';
+    } else if (event === 'DISPATCH_SHIPMENT') {
+      const trackingNumber = payload?.trackingNumber || payload?.input?.trackingNumber;
+      if (!trackingNumber || typeof trackingNumber !== 'string' || !trackingNumber.trim()) {
+        violations.push('MISSING_TRACKING_NUMBER: trackingNumber is required to dispatch shipment.');
+      } else {
+        validatedGuards.push('hasValidTracking');
+      }
+      targetState = 'in_transit';
+    } else {
+      const transitionDef = (stateDef.on as any)?.[event];
+      targetState = typeof transitionDef === 'string' ? transitionDef : (transitionDef as any)?.target || 'unknown';
+    }
+
+    if (violations.length > 0) {
+      return {
+        status: 'REJECTED',
+        domain: 'fulfillment',
+        sourceState,
+        error: `Proposal rejected due to invariant violations: ${violations.join('; ')}`,
+        violations,
+        feedback: 'The proposed resolver failed one or more mathematical invariants in the fulfillment domain.',
+      };
+    }
+
+    return {
+      status: 'APPROVED',
+      domain: 'fulfillment',
+      sourceState,
+      targetState,
+      validatedGuards,
+      feedback: `Proposal successfully validated! Legal transition from '${sourceState}' to '${targetState}' via '${event}' in domain 'fulfillment'. Conforms to GraphQL mutation '${mutationName}'.`,
+    };
+  }
+
+  private validateCheckoutProposal(input: ProposeResolverInput): ProposeResolverResult {
     const { mutationName, sourceState, event, payload, implementationCode } = input;
     const machineConfig = checkoutMachine.config;
     const stateDef = machineConfig.states?.[sourceState];
@@ -150,6 +433,7 @@ export class AxiomaMCPServer {
     if (!stateDef) {
       return {
         status: 'REJECTED',
+        domain: 'checkout',
         sourceState,
         error: `State '${sourceState}' does not exist in checkoutMachine. Admissible states: ${Object.keys(machineConfig.states || {}).join(', ')}`,
         violations: ['UNKNOWN_SOURCE_STATE'],
@@ -162,6 +446,7 @@ export class AxiomaMCPServer {
     if (!admissibleEvents.includes(event)) {
       return {
         status: 'REJECTED',
+        domain: 'checkout',
         sourceState,
         error: `Transition violation: Event '${event}' is not admissible from state '${sourceState}'. Legal events: [${admissibleEvents.join(', ')}]`,
         violations: ['ILLEGAL_STATE_TRANSITION'],
@@ -170,11 +455,12 @@ export class AxiomaMCPServer {
     }
 
     // 3. Validate GraphQL schema conformance
-    const schema = this.getGraphQLSchema();
+    const schema = this.getGraphQLSchema('checkout');
     const mutationRegex = new RegExp(`\\b${mutationName}\\s*\\(`, 'm');
     if (!mutationRegex.test(schema)) {
       return {
         status: 'REJECTED',
+        domain: 'checkout',
         sourceState,
         error: `Schema violation: Mutation '${mutationName}' does not exist in schema.graphql.`,
         violations: ['GRAPHQL_MUTATION_NOT_FOUND'],
@@ -272,6 +558,7 @@ export class AxiomaMCPServer {
     if (violations.length > 0) {
       return {
         status: 'REJECTED',
+        domain: 'checkout',
         sourceState,
         error: `Proposal rejected due to invariant violations: ${violations.join('; ')}`,
         violations,
@@ -281,6 +568,7 @@ export class AxiomaMCPServer {
 
     return {
       status: 'APPROVED',
+      domain: 'checkout',
       sourceState,
       targetState,
       validatedGuards,
@@ -291,8 +579,11 @@ export class AxiomaMCPServer {
   /**
    * Extracts only the relevant GraphQL types for a given state boundary
    */
-  private extractSubgraphForState(stateName: string): string {
-    const fullSchema = this.getGraphQLSchema();
+  private extractSubgraphForState(stateName: string, domain: DomainName = 'checkout'): string {
+    if (domain === 'fulfillment') {
+      return `Domain: Fulfillment. Types: InventoryItem, FulfillmentItem, ShippingPackage, FulfillmentJob. Mutations: allocateInventory, printShippingLabel, dispatchShipment`;
+    }
+    const fullSchema = this.getGraphQLSchema('checkout');
     if (stateName === 'empty_cart' || stateName === 'cart_active') {
       return `Types: Cart, CartItem, AddItemInput. Mutations: addItemToCart, removeItemFromCart, initiateCheckout`;
     }
@@ -310,17 +601,77 @@ export class AxiomaMCPServer {
  * Creates and configures a Model Context Protocol (MCP) Server instance
  * exposing Axioma's architecture as read-only resources and governance tools.
  */
-export function createAxiomaMcpServer(baseDir: string = process.cwd()): McpServer {
-  const axioma = new AxiomaMCPServer(baseDir);
+export function createAxiomaMcpServer(baseDir: string = process.cwd(), defaultDomain: DomainName = 'checkout'): McpServer {
+  const axioma = new AxiomaMCPServer(baseDir, defaultDomain);
 
   const server = new McpServer({
     name: 'axioma-governance-server',
     version: '1.0.0',
   });
 
-  // --- MCP Resources ---
+  // --- Domain-Scoped MCP Resources ---
 
-  // Resource 1: GraphQL Schema
+  // Resource 1: Fulfillment GraphQL Schema
+  server.resource(
+    'fulfillment-graphql-schema',
+    'axioma://domains/fulfillment/schema',
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: axioma.getGraphQLSchema('fulfillment'),
+          mimeType: 'text/plain',
+        },
+      ],
+    })
+  );
+
+  // Resource 2: Fulfillment State Machine Source
+  server.resource(
+    'fulfillment-machine-source',
+    'axioma://domains/fulfillment/state',
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: axioma.getStateMachineSource('fulfillment'),
+          mimeType: 'text/plain',
+        },
+      ],
+    })
+  );
+
+  // Resource 3: Checkout Domain GraphQL Schema
+  server.resource(
+    'checkout-domain-graphql-schema',
+    'axioma://domains/checkout/schema',
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: axioma.getGraphQLSchema('checkout'),
+          mimeType: 'text/plain',
+        },
+      ],
+    })
+  );
+
+  // Resource 4: Checkout Domain State Machine Source
+  server.resource(
+    'checkout-domain-machine-source',
+    'axioma://domains/checkout/state',
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: axioma.getStateMachineSource('checkout'),
+          mimeType: 'text/plain',
+        },
+      ],
+    })
+  );
+
+  // Legacy Resource: GraphQL Schema
   server.resource(
     'graphql-schema',
     'axioma://schema/graphql',
@@ -328,14 +679,14 @@ export function createAxiomaMcpServer(baseDir: string = process.cwd()): McpServe
       contents: [
         {
           uri: uri.href,
-          text: axioma.getGraphQLSchema(),
+          text: axioma.getGraphQLSchema('checkout'),
           mimeType: 'text/plain',
         },
       ],
     })
   );
 
-  // Resource 2: XState Machine Source
+  // Legacy Resource: XState Machine Source
   server.resource(
     'checkout-machine-source',
     'axioma://machines/checkout',
@@ -343,14 +694,14 @@ export function createAxiomaMcpServer(baseDir: string = process.cwd()): McpServe
       contents: [
         {
           uri: uri.href,
-          text: axioma.getStateMachineSource(),
+          text: axioma.getStateMachineSource('checkout'),
           mimeType: 'text/plain',
         },
       ],
     })
   );
 
-  // Resource 3: XState Machine State Graph (JSON)
+  // Legacy Resource: XState Machine State Graph (JSON)
   server.resource(
     'checkout-machine-json',
     'axioma://machines/json',
@@ -358,7 +709,7 @@ export function createAxiomaMcpServer(baseDir: string = process.cwd()): McpServe
       contents: [
         {
           uri: uri.href,
-          text: JSON.stringify(axioma.getStateMachineJSON(), null, 2),
+          text: JSON.stringify(axioma.getStateMachineJSON('checkout'), null, 2),
           mimeType: 'application/json',
         },
       ],
@@ -371,11 +722,12 @@ export function createAxiomaMcpServer(baseDir: string = process.cwd()): McpServe
   server.tool(
     'introspect_state',
     {
-      stateName: z.string().describe('The name of the state in checkoutMachine, e.g. empty_cart, cart_active, checkout_draft, pending_payment, paid, fulfilled'),
+      stateName: z.string().describe('The name of the state, e.g. empty_cart, pending_payment, unfulfilled, inventory_allocated'),
+      domain: z.enum(['checkout', 'fulfillment']).optional().describe('Optional domain context filter'),
     },
-    async ({ stateName }) => {
+    async ({ stateName, domain }) => {
       try {
-        const response = axioma.introspectStateBoundary(stateName);
+        const response = axioma.introspectStateBoundary(stateName, domain);
         return {
           content: [
             {
@@ -402,10 +754,11 @@ export function createAxiomaMcpServer(baseDir: string = process.cwd()): McpServe
   server.tool(
     'propose_resolver',
     {
-      mutationName: z.string().describe('The GraphQL mutation name, e.g. submitPayment, initiateCheckout, attachShippingAddress'),
-      sourceState: z.string().describe('The current XState state, e.g. pending_payment, cart_active'),
-      event: z.string().describe('The XState event name to transition on, e.g. SUBMIT_PAYMENT, INITIATE_CHECKOUT'),
-      payload: z.record(z.string(), z.any()).describe('The input payload including IDs, idempotencyKey, amounts, or address fields'),
+      domain: z.enum(['checkout', 'fulfillment']).optional().describe('The domain scope: checkout or fulfillment'),
+      mutationName: z.string().describe('The GraphQL mutation name, e.g. submitPayment, allocateInventory'),
+      sourceState: z.string().describe('The current XState state, e.g. pending_payment, unfulfilled'),
+      event: z.string().describe('The XState event name to transition on, e.g. SUBMIT_PAYMENT, ALLOCATE_INVENTORY'),
+      payload: z.record(z.string(), z.any()).describe('The input payload including IDs, idempotencyKey, amounts, or items'),
       implementationCode: z.string().describe('The TypeScript/Drizzle/PostgreSQL code implementing the mutation resolver'),
     },
     async (input) => {

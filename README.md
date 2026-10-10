@@ -1,13 +1,20 @@
-# Axioma: Zero-Trust LLM Governance via Formal State Machines & Schema Boundaries
+# Axioma: Zero-Trust LLM Governance Framework
 
-> **Axioma** is an executable architectural framework that physically boxes in autonomous AI coding agents using formal visual state graphs (XState v5), rigid API schemas (GraphQL), and active governance protocols (Model Context Protocol / MCP).
+[![CI](https://github.com/Michlipski/axioma-mcp-governance/actions/workflows/ci.yml/badge.svg)](https://github.com/Michlipski/axioma-mcp-governance/actions)
+![Tests](https://img.shields.io/badge/Invariants_Verified-58%2F58-emerald)
+![Architecture](https://img.shields.io/badge/MCP-Gateway_Proxy_:3001-blue)
+![State Machine](https://img.shields.io/badge/FSM-XState_v5-purple)
+![GraphQL](https://img.shields.io/badge/GraphQL-Strict%20AST-e10098)
 
-[![Node Test Suite](https://img.shields.io/badge/tests-42%20passed-brightgreen.svg)]()
-[![Flight Simulator](https://img.shields.io/badge/Flight%20Simulator-%2Fshowcase-059669.svg)]()
-[![MCP Gateway](https://img.shields.io/badge/MCP%20Gateway-Port%203001-2563eb.svg)]()
-[![Core MCP](https://img.shields.io/badge/Core%20MCP-Port%203000-7c3aed.svg)]()
-[![XState](https://img.shields.io/badge/XState-v5-purple.svg)]()
-[![GraphQL](https://img.shields.io/badge/GraphQL-Strict%20Types-e10098.svg)]()
+> Mathematical constraints for non-deterministic AI agents: **XState** (Temporal Logic / Verbs) + **GraphQL AST** (Data Boundaries / Nouns) + **MCP Gateway** (Zero-Trust Auditing & Handoffs).
+
+### Governance Flight Simulator (`/showcase`)
+Run the local control plane to inspect live state machines, trigger cross-domain violations, and watch the gateway intercept rogue agent proposals:
+
+```bash
+npm run dev
+# Open http://localhost:3000/showcase
+```
 
 ---
 
@@ -15,12 +22,15 @@
 
 Axioma includes a developer-focused control plane at **[`/showcase`](http://localhost:3000/showcase)** acting as a "Flight Simulator" for system architects to test deterministic LLM governance:
 
-* **Topology & Active State Boundary Viewer:** Live visual inspection of the finite state machine (`empty_cart`, `checkout_draft`, `pending_payment`, `paid`), explicitly displaying legal transitions versus mathematically forbidden actions.
+* **Dual-Domain Topology & Active State Boundary Viewer:** Live visual inspection of both finite state machines (`checkoutMachine` and `fulfillmentMachine`), explicitly displaying legal transitions versus mathematically forbidden actions and domain-scoped schemas (`axioma://domains/<domain>/schema`).
 * **Agent Intent Dispatcher:** Interactive scenario triggers sending JSON-RPC proposals directly through the Zero-Trust Gateway on port `3001`:
   1. *Rogue Agent: Attempt Discount on Empty Cart* &rarr; **`REJECTED`** (`ILLEGAL_STATE_TRANSITION`)
   2. *Compliant Agent: Execute Legal Payment* &rarr; **`APPROVED`** (Advances to `payment_processing`)
   3. *Rogue Agent: Submit Payment Without Idempotency Key* &rarr; **`REJECTED`** (`MISSING_IDEMPOTENCY_KEY`)
-* **Live Audit Stream:** Real-time stream of `agent_audit_logs` from PostgreSQL with status chips (`INTERCEPTED`, `APPROVED`, `REJECTED`) and expandable JSON inspection drawers.
+  4. *Rogue Fulfillment Agent: Cross-Domain Mutation* &rarr; **`REJECTED`** (`DOMAIN_BOUNDARY_VIOLATION`)
+  5. *Order-Paid Event Handoff: Spawn Fulfillment Worker* &rarr; **`APPROVED`** (Advances to `inventory_allocated`)
+  6. *Fulfillment Progression: Print Shipping Label* &rarr; **`APPROVED`** (Advances to `label_printed`)
+* **Live Audit Stream:** Real-time stream of `agent_audit_logs` from PostgreSQL with status chips (`INTERCEPTED`, `APPROVED`, `REJECTED`), domain filter chips (`All`, `Checkout`, `Fulfillment`), and expandable JSON inspection drawers.
 * **Declarative Scenarios Directory:** Reproducible fixtures under [`showcase/scenarios/`](./showcase/scenarios/) with a 2-minute architectural brief in [`showcase/README.md`](./showcase/README.md).
 
 ---
@@ -247,7 +257,10 @@ axioma/
 │   └── scenarios/
 │       ├── 01-illegal-discount-on-empty-cart.json  # Rogue agent empty cart discount fixture
 │       ├── 02-valid-checkout-and-payment.json      # Compliant agent payment fixture
-│       └── 03-missing-idempotency-key.json         # Guard failure fixture
+│       ├── 03-missing-idempotency-key.json         # Guard failure fixture
+│       ├── 04-cross-domain-boundary-violation.json # Cross-domain rogue worker violation
+│       ├── 05-cross-domain-handoff-success.json    # Event-driven handoff & allocation fixture
+│       └── 06-legal-fulfillment-progression.json   # Legal fulfillment label printing fixture
 ├── src/
 │   ├── app/
 │   │   ├── showcase/page.tsx     # Governance Flight Simulator control plane
@@ -258,9 +271,11 @@ axioma/
 │   ├── gateway/
 │   │   └── server.ts             # Zero-Trust MCP Gateway proxy (:3001 -> :3000)
 │   ├── machines/
-│   │   └── checkoutMachine.ts    # Formal XState v5 checkout finite state machine
+│   │   ├── checkoutMachine.ts    # Formal XState v5 checkout finite state machine
+│   │   └── fulfillmentMachine.ts # Formal XState v5 fulfillment finite state machine
 │   ├── graphql/
-│   │   ├── schema.graphql        # Rigid GraphQL nouns & mutations
+│   │   ├── schema.graphql        # Rigid GraphQL nouns & mutations (Checkout)
+│   │   ├── schema.fulfillment.graphql # Scoped shipping & inventory nouns (Fulfillment)
 │   │   └── resolvers.ts          # State-machine projected resolvers
 │   ├── mcp/
 │   │   ├── server.ts             # Model Context Protocol server, tools, & resources
@@ -270,6 +285,7 @@ axioma/
 │       ├── schema.ts             # PostgreSQL tables: carts, orders, agent_audit_logs
 │       └── index.ts              # Drizzle ORM connection pool
 ├── tests/
+│   ├── crossDomain.test.ts       # Cross-domain handoff & isolation tests
 │   ├── showcase.test.ts          # Showcase fixtures & invariant verification
 │   ├── gateway.test.ts           # Gateway proxy, decompression, & telemetry tests
 │   ├── checkoutMachine.test.ts   # Formal state machine mathematical invariant tests
@@ -288,7 +304,7 @@ axioma/
 npm install
 ```
 
-### 2. Run the Full Test Suite (42 Tests)
+### 2. Run the Full Test Suite (58 Invariant Tests)
 ```bash
 npm test
 ```

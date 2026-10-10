@@ -165,6 +165,7 @@ export const agentAuditLogs = pgTable('agent_audit_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   agentId: text('agent_id').notNull(),
   sessionId: text('session_id').notNull(),
+  domain: text('domain'),
   toolName: text('tool_name').notNull(),
   payload: jsonb('payload').notNull(),
   response: jsonb('response'),

@@ -70,6 +70,9 @@ Declarative JSON fixtures under `showcase/scenarios/` provide reproducible paylo
 | [`01-illegal-discount-on-empty-cart.json`](./scenarios/01-illegal-discount-on-empty-cart.json) | Rogue Agent: Attempt Discount on Empty Cart | `REJECTED` | `APPLY_DISCOUNT` is mathematically impossible from `empty_cart`. |
 | [`02-valid-checkout-and-payment.json`](./scenarios/02-valid-checkout-and-payment.json) | Compliant Agent: Execute Legal Payment | `APPROVED` | Satisfies state guards, idempotency check, and amount invariants. |
 | [`03-missing-idempotency-key.json`](./scenarios/03-missing-idempotency-key.json) | Rogue Agent: Submit Payment Without Idempotency Key | `REJECTED` | Missing required idempotency key violates payment safety guard. |
+| [`04-cross-domain-boundary-violation.json`](./scenarios/04-cross-domain-boundary-violation.json) | Rogue Fulfillment Agent: Cross-Domain Mutation | `REJECTED` | `agent-fulfillment-worker` attempted checkout mutation `submitPayment`; rejected with `DOMAIN_BOUNDARY_VIOLATION`. |
+| [`05-cross-domain-handoff-success.json`](./scenarios/05-cross-domain-handoff-success.json) | Order-Paid Event Handoff: Spawn Fulfillment Worker | `APPROVED` | Checkout transition to `paid` triggers `ORDER_PAID` event, spawning worker with `ALLOCATE_INVENTORY`. |
+| [`06-legal-fulfillment-progression.json`](./scenarios/06-legal-fulfillment-progression.json) | Fulfillment Progression: Print Shipping Label | `APPROVED` | Fulfillment worker legal transition `inventory_allocated` $\to$ `label_printed` via `PRINT_LABEL`. |
 
 ---
 

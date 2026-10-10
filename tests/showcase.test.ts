@@ -87,6 +87,74 @@ describe('Axioma Showcase - Scenarios & Governance Verification', () => {
     assert.strictEqual(verdict, 'REJECTED');
   });
 
+  test('Fixture 04: Cross-domain boundary violation is strictly REJECTED with DOMAIN_BOUNDARY_VIOLATION', () => {
+    const fixturePath = path.join(scenariosDir, '04-cross-domain-boundary-violation.json');
+    assert.ok(fs.existsSync(fixturePath), 'Fixture 04 must exist');
+
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
+    assert.strictEqual(fixture.expectedVerdict, 'REJECTED');
+    assert.strictEqual(fixture.domain, 'fulfillment');
+
+    const args = fixture.rpcRequest.params.arguments;
+    const result = mcp.proposeResolver(args);
+
+    assert.strictEqual(result.status, 'REJECTED');
+    assert.ok(result.violations?.includes('DOMAIN_BOUNDARY_VIOLATION'));
+
+    // Gateway evaluation check
+    const mockMcpResponse = {
+      result: {
+        isError: true,
+        content: [{ type: 'text', text: JSON.stringify(result) }],
+      },
+    };
+    const verdict = evaluateVerdict(200, mockMcpResponse);
+    assert.strictEqual(verdict, 'REJECTED');
+  });
+
+  test('Fixture 05: Event-driven domain handoff and allocation is APPROVED', () => {
+    const fixturePath = path.join(scenariosDir, '05-cross-domain-handoff-success.json');
+    assert.ok(fs.existsSync(fixturePath), 'Fixture 05 must exist');
+
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
+    assert.strictEqual(fixture.expectedVerdict, 'APPROVED');
+    assert.strictEqual(fixture.domain, 'fulfillment');
+    assert.strictEqual(fixture.currentState, 'unfulfilled');
+
+    const args = fixture.rpcRequest.params.arguments;
+    const result = mcp.proposeResolver(args);
+
+    assert.strictEqual(result.status, 'APPROVED');
+    assert.strictEqual(result.targetState, 'inventory_allocated');
+    assert.ok(result.validatedGuards?.includes('hasOrderId'));
+
+    // Gateway evaluation check
+    const mockMcpResponse = {
+      result: {
+        isError: false,
+        content: [{ type: 'text', text: JSON.stringify(result) }],
+      },
+    };
+    const verdict = evaluateVerdict(200, mockMcpResponse);
+    assert.strictEqual(verdict, 'APPROVED');
+  });
+
+  test('Fixture 06: Legal fulfillment label printing is APPROVED', () => {
+    const fixturePath = path.join(scenariosDir, '06-legal-fulfillment-progression.json');
+    assert.ok(fs.existsSync(fixturePath), 'Fixture 06 must exist');
+
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
+    assert.strictEqual(fixture.expectedVerdict, 'APPROVED');
+    assert.strictEqual(fixture.domain, 'fulfillment');
+
+    const args = fixture.rpcRequest.params.arguments;
+    const result = mcp.proposeResolver(args);
+
+    assert.strictEqual(result.status, 'APPROVED');
+    assert.strictEqual(result.targetState, 'label_printed');
+    assert.ok(result.validatedGuards?.includes('hasValidCarrier'));
+  });
+
   test('Showcase README exists and documents thesis and ports', () => {
     const readmePath = path.join(process.cwd(), 'showcase/README.md');
     assert.ok(fs.existsSync(readmePath), 'showcase/README.md must exist');

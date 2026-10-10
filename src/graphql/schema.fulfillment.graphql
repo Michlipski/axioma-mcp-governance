@@ -1,0 +1,117 @@
+"""
+Fulfillment Domain GraphQL Nouns Schema - Axioma Executable Architecture
+Generated strictly from Phase 0 Trace Specification:
+- trace/domains/fulfillment.domain.md
+
+Least-Privilege Context:
+Strictly limited to Shipping and Inventory entities.
+Cart and Payment types are completely omitted.
+"""
+
+scalar DateTime
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  INVENTORY_ALLOCATED
+  LABEL_PRINTED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum InventoryStatus {
+  IN_STOCK
+  RESERVED
+  OUT_OF_STOCK
+}
+
+type InventoryItem {
+  id: ID!
+  sku: String!
+  title: String!
+  warehouseId: String!
+  availableQuantity: Int!
+  allocatedQuantity: Int!
+  status: InventoryStatus!
+}
+
+type FulfillmentItem {
+  sku: String!
+  quantity: Int!
+}
+
+type ShippingAddress {
+  id: ID!
+  recipientName: String!
+  addressLine1: String!
+  city: String!
+  postalCode: String!
+  country: String!
+}
+
+type ShippingPackage {
+  id: ID!
+  orderId: ID!
+  carrier: String!
+  trackingNumber: String
+  labelUrl: String
+  status: String!
+  estimatedDelivery: DateTime
+}
+
+type FulfillmentJob {
+  id: ID!
+  orderId: ID!
+  status: FulfillmentStatus!
+  trackingNumber: String
+  carrier: String
+  shippingAddress: ShippingAddress
+  items: [FulfillmentItem!]!
+  dispatchedAt: DateTime
+  createdAt: DateTime!
+}
+
+# --- Queries ---
+
+type Query {
+  fulfillmentJob(orderId: ID!): FulfillmentJob
+  inventoryItem(sku: String!): InventoryItem
+  shippingPackage(orderId: ID!): ShippingPackage
+}
+
+# --- Inputs ---
+
+input FulfillmentItemInput {
+  sku: String!
+  quantity: Int!
+}
+
+input AllocateInventoryInput {
+  orderId: ID!
+  items: [FulfillmentItemInput!]!
+}
+
+input PrintShippingLabelInput {
+  orderId: ID!
+  carrier: String!
+  serviceLevel: String
+}
+
+input DispatchShipmentInput {
+  orderId: ID!
+  trackingNumber: String!
+  carrier: String!
+}
+
+# --- Mutations (Strictly Governed by fulfillmentMachine Transitions) ---
+
+type Mutation {
+  # Transition: UNFULFILLED -> INVENTORY_ALLOCATED
+  allocateInventory(orderId: ID!, input: AllocateInventoryInput): FulfillmentJob!
+
+  # Transition: INVENTORY_ALLOCATED -> LABEL_PRINTED
+  printShippingLabel(orderId: ID!, input: PrintShippingLabelInput!): ShippingPackage!
+
+  # Transition: LABEL_PRINTED -> IN_TRANSIT
+  dispatchShipment(orderId: ID!, input: DispatchShipmentInput!): FulfillmentJob!
+}

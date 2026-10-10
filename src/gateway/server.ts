@@ -47,6 +47,7 @@ export interface ExtractedMetadata {
   agentId: string;
   sessionId: string;
   toolName: string;
+  domain?: string;
 }
 
 /**
@@ -78,7 +79,15 @@ export function extractMetadata(
     body?.method ||
     'unknown';
 
-  return { agentId, sessionId, toolName };
+  const domain =
+    (headers['x-domain'] as string) ||
+    (headers['domain'] as string) ||
+    body?.params?._meta?.domain ||
+    body?.params?.arguments?.domain ||
+    body?.params?.domain ||
+    (agentId.includes('fulfillment') ? 'fulfillment' : 'checkout');
+
+  return { agentId, sessionId, toolName, domain };
 }
 
 /**
@@ -175,7 +184,8 @@ export function executeInternalMcpCall(body: any, engine: AxiomaMCPServer = fall
     const args = params?.arguments || {};
 
     if (toolName === 'propose_resolver') {
-      const result = engine.proposeResolver(args);
+      const domain = args.domain || body?.params?._meta?.domain;
+      const result = engine.proposeResolver({ ...args, domain: domain || args.domain });
       return {
         jsonrpc: '2.0',
         id: id ?? null,
@@ -193,7 +203,8 @@ export function executeInternalMcpCall(body: any, engine: AxiomaMCPServer = fall
 
     if (toolName === 'introspect_state') {
       try {
-        const result = engine.introspectStateBoundary(args.stateName);
+        const domain = args.domain || body?.params?._meta?.domain;
+        const result = engine.introspectStateBoundary(args.stateName, domain);
         return {
           jsonrpc: '2.0',
           id: id ?? null,
@@ -221,21 +232,39 @@ export function executeInternalMcpCall(body: any, engine: AxiomaMCPServer = fall
 
   if (method === 'resources/read') {
     const uri = params?.uri;
-    if (uri === 'axioma://schema/graphql') {
+    if (uri === 'axioma://domains/fulfillment/schema') {
       return {
         jsonrpc: '2.0',
         id: id ?? null,
         result: {
-          contents: [{ uri, text: engine.getGraphQLSchema(), mimeType: 'text/plain' }],
+          contents: [{ uri, text: engine.getGraphQLSchema('fulfillment'), mimeType: 'text/plain' }],
         },
       };
     }
-    if (uri === 'axioma://machines/checkout') {
+    if (uri === 'axioma://domains/fulfillment/state') {
       return {
         jsonrpc: '2.0',
         id: id ?? null,
         result: {
-          contents: [{ uri, text: engine.getStateMachineSource(), mimeType: 'text/plain' }],
+          contents: [{ uri, text: engine.getStateMachineSource('fulfillment'), mimeType: 'text/plain' }],
+        },
+      };
+    }
+    if (uri === 'axioma://schema/graphql' || uri === 'axioma://domains/checkout/schema') {
+      return {
+        jsonrpc: '2.0',
+        id: id ?? null,
+        result: {
+          contents: [{ uri, text: engine.getGraphQLSchema('checkout'), mimeType: 'text/plain' }],
+        },
+      };
+    }
+    if (uri === 'axioma://machines/checkout' || uri === 'axioma://domains/checkout/state') {
+      return {
+        jsonrpc: '2.0',
+        id: id ?? null,
+        result: {
+          contents: [{ uri, text: engine.getStateMachineSource('checkout'), mimeType: 'text/plain' }],
         },
       };
     }
@@ -342,15 +371,35 @@ export function handleGatewayRequest(
           id: logId,
           agentId: metadata.agentId,
           sessionId: metadata.sessionId,
+          domain: metadata.domain,
           toolName: metadata.toolName,
           payload: parsedPayload ?? { raw: rawBodyString },
           status: 'INTERCEPTED',
           createdAt: new Date(),
-        });
+        } as any);
       } catch (dbErr: any) {
-        process.stderr.write(
-          `[MCP Gateway Warning] Initial audit log insert failed: ${dbErr?.message || String(dbErr)}\n`
-        );
+        // Fallback if domain column is not yet present on legacy DB schema
+        try {
+          await db.insert(schema.agentAuditLogs).values({
+            id: logId,
+            agentId: metadata.agentId,
+            sessionId: metadata.sessionId,
+            toolName: metadata.toolName,
+            payload: {
+              ...(parsedPayload ?? { raw: rawBodyString }),
+              _meta: {
+                ...(parsedPayload?.params?._meta || {}),
+                domain: metadata.domain,
+              },
+            },
+            status: 'INTERCEPTED',
+            createdAt: new Date(),
+          } as any);
+        } catch {
+          process.stderr.write(
+            `[MCP Gateway Warning] Initial audit log insert failed: ${dbErr?.message || String(dbErr)}\n`
+          );
+        }
       }
 
       // Step 2: Forward unmutated payload to true MCP server on port 3000

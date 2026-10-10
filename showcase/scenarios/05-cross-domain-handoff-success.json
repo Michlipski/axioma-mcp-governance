@@ -1,0 +1,58 @@
+{
+  "id": "scenario-05-cross-domain-handoff-success",
+  "title": "Event-Driven Domain Handoff: ORDER_PAID to Fulfillment Allocation",
+  "persona": "Isolated Fulfillment Worker (agent-fulfillment-worker)",
+  "domain": "fulfillment",
+  "expectedVerdict": "APPROVED",
+  "violationCategory": "NONE",
+  "targetMachine": "fulfillmentMachine",
+  "currentState": "unfulfilled",
+  "targetEvent": "ALLOCATE_INVENTORY",
+  "emittedEvent": {
+    "type": "ORDER_PAID",
+    "payload": {
+      "orderId": "ord_9981"
+    }
+  },
+  "invariantSummary": "Following receipt of event 'ORDER_PAID', the newly spawned agent-fulfillment-worker proposes 'allocateInventory' from 'unfulfilled'. The proposal satisfies all invariants within the fulfillment domain and transitions to 'inventory_allocated'.",
+  "rpcRequest": {
+    "jsonrpc": "2.0",
+    "id": "sim-req-005",
+    "method": "tools/call",
+    "params": {
+      "name": "propose_resolver",
+      "_meta": {
+        "agentId": "agent-fulfillment-worker",
+        "sessionId": "session-sim-005-handoff-allocation",
+        "domain": "fulfillment"
+      },
+      "arguments": {
+        "domain": "fulfillment",
+        "mutationName": "allocateInventory",
+        "sourceState": "unfulfilled",
+        "event": "ALLOCATE_INVENTORY",
+        "payload": {
+          "orderId": "ord_9981",
+          "items": [
+            {
+              "sku": "SKU-AXIOMA-01",
+              "quantity": 1
+            }
+          ]
+        },
+        "implementationCode": "// Valid fulfillment inventory allocation resolver\nexport async function resolveAllocateInventory(input: { orderId: string; items: Array<{ sku: string; quantity: number }> }) {\n  const [job] = await db.insert(schema.fulfillmentJobs).values({\n    orderId: input.orderId,\n    status: 'QUEUED',\n  }).returning();\n  return job;\n}"
+      }
+    }
+  },
+  "expectedVerdictDetails": {
+    "status": "APPROVED",
+    "domain": "fulfillment",
+    "sourceState": "unfulfilled",
+    "targetState": "inventory_allocated",
+    "validatedGuards": [
+      "hasOrderId",
+      "hasItems"
+    ],
+    "feedback": "Proposal successfully validated! Legal transition from 'unfulfilled' to 'inventory_allocated' via 'ALLOCATE_INVENTORY' in domain 'fulfillment'. Conforms to GraphQL mutation 'allocateInventory'."
+  }
+}
