@@ -258,9 +258,10 @@ export default function ShowcasePage() {
   // Poll audit logs from Next.js API route
   const fetchAuditLogs = useCallback(async () => {
     try {
+      const basePath = '/axioma';
       const url = domainFilter === 'all'
-        ? '/api/audit-logs?limit=30'
-        : `/api/audit-logs?limit=30&domain=${domainFilter}`;
+        ? `${basePath}/api/audit-logs?limit=30`
+        : `${basePath}/api/audit-logs?limit=30&domain=${domainFilter}`;
 
       const res = await fetch(url);
       if (!res.ok) {
