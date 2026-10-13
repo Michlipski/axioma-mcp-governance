@@ -301,7 +301,7 @@ export function handleGatewayRequest(
     res.once('finish', () => resolve());
     res.once('close', () => resolve());
 
-    const port = config?.port ?? Number(process.env.GATEWAY_PORT || 3001);
+    const port = config?.port ?? Number(process.env.PORT || process.env.GATEWAY_PORT || 3001);
     const targetMcpUrl = config?.targetMcpUrl ?? (process.env.TARGET_MCP_URL || 'http://localhost:3000');
     const db = config?.db ?? defaultDb;
 
@@ -591,7 +591,7 @@ export function createGatewayServer(config?: Partial<GatewayConfig>): http.Serve
 /**
  * Starts the MCP Gateway server on port 3001.
  */
-export function startGatewayServer(port: number = Number(process.env.GATEWAY_PORT || 3001)) {
+export function startGatewayServer(port: number = Number(process.env.PORT || process.env.GATEWAY_PORT || 3001)) {
   const server = createGatewayServer({ port });
   server.listen(port, () => {
     process.stdout.write(

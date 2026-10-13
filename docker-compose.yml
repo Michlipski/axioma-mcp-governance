@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: axioma-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: axioma
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: axioma-gateway
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/axioma
+      TARGET_MCP_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
