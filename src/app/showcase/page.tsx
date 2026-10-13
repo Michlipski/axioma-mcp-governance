@@ -241,15 +241,23 @@ export default function ShowcasePage() {
   // Inspection Drawer
   const [inspectRecord, setInspectRecord] = useState<AuditLogRecord | null>(null);
 
-  // Ping Gateway status on load
+  // Ping Gateway status on load (checks local daemon or serverless route)
   const checkGatewayHealth = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:3001/health', { method: 'GET' });
-      if (res.ok) {
-        setGatewayStatus('UP');
-      } else {
-        setGatewayStatus('DOWN');
+      let isUp = false;
+      try {
+        const res = await fetch('http://localhost:3001/health', { method: 'GET' });
+        if (res.ok) isUp = true;
+      } catch {}
+
+      if (!isUp) {
+        try {
+          const res = await fetch('/axioma/api/gateway', { method: 'GET' });
+          if (res.ok) isUp = true;
+        } catch {}
       }
+
+      setGatewayStatus(isUp ? 'UP' : 'DOWN');
     } catch {
       setGatewayStatus('DOWN');
     }
@@ -529,17 +537,31 @@ export default function ShowcasePage() {
     const sessionId = parsedPayload?.params?._meta?.sessionId || `sim-${domain}-${Date.now()}`;
 
     try {
-      // Must hit port 3001 (MCP Gateway proxy)
-      const res = await fetch('http://localhost:3001/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-agent-id': agentId,
-          'x-domain': domain,
-          'x-session-id': sessionId,
-        },
-        body: JSON.stringify(parsedPayload),
-      });
+      // Try port 3001 first (local proxy), otherwise fall back to cloud serverless gateway
+      let res: Response;
+      try {
+        res = await fetch('http://localhost:3001/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-agent-id': agentId,
+            'x-domain': domain,
+            'x-session-id': sessionId,
+          },
+          body: JSON.stringify(parsedPayload),
+        });
+      } catch {
+        res = await fetch('/axioma/api/gateway', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-agent-id': agentId,
+            'x-domain': domain,
+            'x-session-id': sessionId,
+          },
+          body: JSON.stringify(parsedPayload),
+        });
+      }
 
       const rawText = await res.text();
       let responseJson: any;

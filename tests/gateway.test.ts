@@ -417,4 +417,52 @@ describe('Axioma MCP Gateway - Zero-Trust JSON-RPC Proxy & Telemetry', () => {
     assert.strictEqual(clean.nested.another, 'value');
     assert.deepStrictEqual(clean.list, ['item1', 'item2']);
   });
+
+  test('Serverless Gateway Route: GET /api/gateway returns status UP and CORS headers', async () => {
+    const { GET, OPTIONS } = await import('../src/app/api/gateway/route');
+    const optRes = await OPTIONS();
+    assert.strictEqual(optRes.status, 204);
+    assert.strictEqual(optRes.headers.get('access-control-allow-origin'), '*');
+
+    const getRes = await GET();
+    assert.strictEqual(getRes.status, 200);
+    const data = await getRes.json();
+    assert.strictEqual(data.status, 'UP');
+    assert.strictEqual(data.listeningRoute, '/axioma/api/gateway');
+  });
+
+  test('Serverless Gateway Route: POST /api/gateway evaluates formal proposal mathematically', async () => {
+    const { POST } = await import('../src/app/api/gateway/route');
+    const { NextRequest } = await import('next/server');
+
+    const req = new NextRequest('http://localhost:3000/axioma/api/gateway', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-agent-id': 'agent-rogue-eval',
+        'x-session-id': 'session-serverless-test',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'test-serverless-1',
+        method: 'tools/call',
+        params: {
+          name: 'propose_resolver',
+          arguments: {
+            stateName: 'empty_cart',
+            eventName: 'SUBMIT_PAYMENT',
+            mutationName: 'submitPayment',
+          },
+        },
+      }),
+    });
+
+    const res = await POST(req);
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.jsonrpc, '2.0');
+    assert.strictEqual(body.result.isError, true);
+    const parsed = JSON.parse(body.result.content[0].text);
+    assert.strictEqual(parsed.status, 'REJECTED');
+  });
 });

@@ -5,7 +5,7 @@ const nextConfig = {
   output: 'standalone',
   experimental: {
     outputFileTracingIncludes: {
-      '/api/**/*': ['./src/graphql/**/*'],
+      '/api/**/*': ['./src/graphql/**/*', './src/machines/**/*'],
     },
   },
   async redirects() {
