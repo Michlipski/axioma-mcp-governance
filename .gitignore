@@ -16,3 +16,5 @@ dist/
 # System & IDE files
 .DS_Store
 *.log
+.vercel
+.env*
