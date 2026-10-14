@@ -165,4 +165,26 @@ describe('Axioma Showcase - Scenarios & Governance Verification', () => {
     assert.ok(content.includes('pending_payment'));
     assert.ok(content.includes('agent_audit_logs'));
   });
+
+  test('Live Audit Stream empty state displays shield emoji 🛡️ without raw &shield; text', () => {
+    const showcasePath = path.join(process.cwd(), 'src/app/showcase/page.tsx');
+    assert.ok(fs.existsSync(showcasePath), 'src/app/showcase/page.tsx must exist');
+    const content = fs.readFileSync(showcasePath, 'utf-8');
+    assert.ok(!content.includes('&shield;'), 'Must not contain raw &shield; entity');
+    assert.ok(content.includes('🛡️'), 'Must contain shield emoji 🛡️ for empty audit stream');
+  });
+
+  test('Dispatch button does not pass React MouseEvent into handleDispatch', () => {
+    const showcasePath = path.join(process.cwd(), 'src/app/showcase/page.tsx');
+    const content = fs.readFileSync(showcasePath, 'utf-8');
+    assert.ok(
+      content.includes('onClick={() => handleDispatch()}'),
+      'Dispatch button must wrap handleDispatch in arrow function to avoid passing MouseEvent'
+    );
+    assert.ok(
+      content.includes('isSyntheticEvent'),
+      'handleDispatch must guard against synthetic event arguments'
+    );
+  });
 });
+

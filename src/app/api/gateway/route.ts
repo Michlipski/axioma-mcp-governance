@@ -8,6 +8,7 @@ import {
   executeInternalMcpCall,
   sanitizeForJsonb,
 } from '@/gateway/server';
+import { recordInMemoryAuditLog } from '@/db/memoryStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -66,7 +67,19 @@ export async function POST(request: NextRequest) {
   const metadata = extractMetadata(headersObj, body);
   const logId = crypto.randomUUID();
 
-  // Step 1: Write initial INTERCEPTED audit log to PostgreSQL (graceful if DB unreachable)
+  // Step 1: Write initial INTERCEPTED audit log to PostgreSQL and in-memory ledger
+  const initialLog = {
+    id: logId,
+    agentId: metadata.agentId,
+    sessionId: metadata.sessionId,
+    domain: metadata.domain,
+    toolName: metadata.toolName,
+    payload: body,
+    status: 'INTERCEPTED' as const,
+    createdAt: new Date().toISOString(),
+  };
+  recordInMemoryAuditLog(initialLog);
+
   try {
     await db.insert(schema.agentAuditLogs).values({
       id: logId,
@@ -119,6 +132,13 @@ export async function POST(request: NextRequest) {
 
   // Step 3: Evaluate verdict (APPROVED / REJECTED)
   const verdict = evaluateVerdict(200, mcpResult);
+
+  // Update in-memory audit log
+  recordInMemoryAuditLog({
+    ...initialLog,
+    status: verdict,
+    response: mcpResult,
+  });
 
   // Step 4: Update PostgreSQL audit log with verdict
   try {

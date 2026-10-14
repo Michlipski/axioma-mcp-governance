@@ -18,7 +18,7 @@ interface AuditLogRecord {
   domain?: 'checkout' | 'fulfillment' | string;
   toolName: string;
   payload: any;
-  response: any;
+  response?: any;
   status: 'INTERCEPTED' | 'APPROVED' | 'REJECTED';
   createdAt: string;
 }
@@ -231,6 +231,9 @@ export default function ShowcasePage() {
   const [dispatchError, setDispatchError] = useState<string | null>(null);
   const [gatewayStatus, setGatewayStatus] = useState<'UP' | 'DOWN' | 'CHECKING'>('CHECKING');
 
+  // Client mounting state to guarantee zero SSR hydration mismatches
+  const [mounted, setMounted] = useState<boolean>(false);
+
   // Audit stream state & Domain Filter
   const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
   const [domainFilter, setDomainFilter] = useState<'all' | 'checkout' | 'fulfillment'>('all');
@@ -245,10 +248,13 @@ export default function ShowcasePage() {
   const checkGatewayHealth = useCallback(async () => {
     try {
       let isUp = false;
-      try {
-        const res = await fetch('http://localhost:3001/health', { method: 'GET' });
-        if (res.ok) isUp = true;
-      } catch {}
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocal) {
+        try {
+          const res = await fetch('http://localhost:3001/health', { method: 'GET' });
+          if (res.ok) isUp = true;
+        } catch {}
+      }
 
       if (!isUp) {
         try {
@@ -281,7 +287,13 @@ export default function ShowcasePage() {
         setDbStatus('UNAVAILABLE');
       } else {
         setDbStatus('OK');
-        setAuditLogs(data.logs || []);
+        if (Array.isArray(data.logs) && data.logs.length > 0) {
+          setAuditLogs((prev) => {
+            const dbIds = new Set(data.logs.map((l: any) => l.id));
+            const clientOnly = prev.filter((l) => !dbIds.has(l.id));
+            return [...data.logs, ...clientOnly].slice(0, 50);
+          });
+        }
       }
       setLastPollTime(new Date().toLocaleTimeString());
     } catch {
@@ -290,6 +302,7 @@ export default function ShowcasePage() {
   }, [domainFilter]);
 
   useEffect(() => {
+    setMounted(true);
     checkGatewayHealth();
     fetchAuditLogs();
 
@@ -510,9 +523,18 @@ export default function ShowcasePage() {
     setDispatchError(null);
     setLastDispatchResponse(null);
 
+    // Guard against React SyntheticEvent when passed directly as an onClick handler
+    const isSyntheticEvent =
+      overridePayload &&
+      (typeof overridePayload.preventDefault === 'function' ||
+        'nativeEvent' in overridePayload ||
+        '_reactName' in overridePayload);
+
+    const actualOverride = isSyntheticEvent ? undefined : overridePayload;
+
     let parsedPayload: any;
-    if (overridePayload) {
-      parsedPayload = overridePayload;
+    if (actualOverride) {
+      parsedPayload = actualOverride;
     } else {
       try {
         parsedPayload = JSON.parse(customRpcJson);
@@ -537,20 +559,26 @@ export default function ShowcasePage() {
     const sessionId = parsedPayload?.params?._meta?.sessionId || `sim-${domain}-${Date.now()}`;
 
     try {
-      // Try port 3001 first (local proxy), otherwise fall back to cloud serverless gateway
-      let res: Response;
-      try {
-        res = await fetch('http://localhost:3001/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-agent-id': agentId,
-            'x-domain': domain,
-            'x-session-id': sessionId,
-          },
-          body: JSON.stringify(parsedPayload),
-        });
-      } catch {
+      // Try port 3001 first on local dev, otherwise use cloud serverless gateway route
+      let res: Response | null = null;
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+      if (isLocal) {
+        try {
+          res = await fetch('http://localhost:3001/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-agent-id': agentId,
+              'x-domain': domain,
+              'x-session-id': sessionId,
+            },
+            body: JSON.stringify(parsedPayload),
+          });
+        } catch {}
+      }
+
+      if (!res) {
         res = await fetch('/axioma/api/gateway', {
           method: 'POST',
           headers: {
@@ -581,21 +609,45 @@ export default function ShowcasePage() {
       });
 
       // Update active machine state if proposal is APPROVED
+      let evaluatedStatus: 'APPROVED' | 'REJECTED' | 'INTERCEPTED' = 'INTERCEPTED';
       const textContent = responseJson?.result?.content?.[0]?.text;
       if (textContent) {
         try {
           const parsed = JSON.parse(textContent);
-          if (parsed.status === 'APPROVED' && parsed.targetState) {
-            if (domain === 'fulfillment') {
-              setFulfillmentState(parsed.targetState);
-              setInspectedNodeKey(parsed.targetState);
-            } else {
-              setCheckoutState(parsed.targetState);
-              setInspectedNodeKey(parsed.targetState);
+          if (parsed.status === 'APPROVED') {
+            evaluatedStatus = 'APPROVED';
+            if (parsed.targetState) {
+              if (domain === 'fulfillment') {
+                setFulfillmentState(parsed.targetState);
+                setInspectedNodeKey(parsed.targetState);
+              } else {
+                setCheckoutState(parsed.targetState);
+                setInspectedNodeKey(parsed.targetState);
+              }
             }
+          } else if (parsed.status === 'REJECTED') {
+            evaluatedStatus = 'REJECTED';
           }
         } catch {}
+      } else if (responseJson?.error || responseJson?.result?.isError) {
+        evaluatedStatus = 'REJECTED';
+      } else if (res.status === 200) {
+        evaluatedStatus = 'APPROVED';
       }
+
+      // Add audit log record to client state immediately for instant feedback
+      const clientLog: AuditLogRecord = {
+        id: `dispatch-${Date.now()}`,
+        agentId,
+        sessionId,
+        domain,
+        toolName: parsedPayload?.params?.name || 'propose_resolver',
+        payload: parsedPayload,
+        response: responseJson,
+        status: evaluatedStatus,
+        createdAt: new Date().toISOString(),
+      };
+      setAuditLogs((prev) => [clientLog, ...prev.filter((p) => p.id !== clientLog.id).slice(0, 49)]);
 
       // Synchronously refresh audit feed to surface the intercepted attempt
       setTimeout(() => {
@@ -2313,7 +2365,7 @@ export default function ShowcasePage() {
                 <button
                   type="button"
                   disabled={isDispatching}
-                  onClick={handleDispatch}
+                  onClick={() => handleDispatch()}
                   style={{
                     backgroundColor: '#059669',
                     color: '#ffffff',
@@ -2580,7 +2632,7 @@ export default function ShowcasePage() {
                 color: '#71717a',
               }}
             >
-              <div style={{ fontSize: '2rem', marginBottom: 8 }}>&shield;</div>
+              <div style={{ fontSize: '2rem', marginBottom: 8 }}>🛡️</div>
               <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#d4d4d8', fontWeight: 600 }}>
                 No Interceptions Matching Domain Filter
               </h3>
@@ -2624,8 +2676,11 @@ export default function ShowcasePage() {
                     const chipColor = isApproved ? '#6ee7b7' : isRejected ? '#fecdd3' : '#fde68a';
                     const chipBorder = isApproved ? '#059669' : isRejected ? '#9f1239' : '#b45309';
 
-                    const toolArgs = log.payload?.params?.arguments || log.payload?.params || {};
-                    const logDomain = (log.domain || (log.agentId?.includes('fulfillment') ? 'fulfillment' : 'checkout')).toLowerCase();
+                    const toolArgs =
+                      log.payload && typeof log.payload === 'object'
+                        ? log.payload?.params?.arguments || log.payload?.params || {}
+                        : {};
+                    const logDomain = (log.domain || (typeof log.agentId === 'string' && log.agentId.includes('fulfillment') ? 'fulfillment' : 'checkout')).toLowerCase();
 
                     return (
                       <tr
@@ -2705,8 +2760,22 @@ export default function ShowcasePage() {
                         </td>
 
                         {/* Timestamp */}
-                        <td style={{ padding: '12px 14px', verticalAlign: 'middle', color: '#71717a', fontSize: '0.72rem' }}>
-                          {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        <td
+                          suppressHydrationWarning
+                          style={{ padding: '12px 14px', verticalAlign: 'middle', color: '#71717a', fontSize: '0.72rem' }}
+                        >
+                          {mounted
+                            ? (() => {
+                                try {
+                                  const d = new Date(log.createdAt);
+                                  return isNaN(d.getTime())
+                                    ? 'n/a'
+                                    : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                } catch {
+                                  return 'n/a';
+                                }
+                              })()
+                            : '--:--:--'}
                         </td>
 
                         {/* Inspect Action */}
@@ -2752,8 +2821,10 @@ export default function ShowcasePage() {
             padding: 20,
             backdropFilter: 'blur(4px)',
           }}
+          onClick={() => setInspectRecord(null)}
         >
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               backgroundColor: '#121215',
               border: '1px solid #3f3f46',
@@ -2781,7 +2852,7 @@ export default function ShowcasePage() {
                       border: `1px solid ${inspectRecord.status === 'APPROVED' ? '#059669' : '#9f1239'}`,
                     }}
                   >
-                    {inspectRecord.status}
+                    {String(inspectRecord.status || 'UNKNOWN')}
                   </span>
                   <span
                     style={{
@@ -2794,14 +2865,14 @@ export default function ShowcasePage() {
                       border: `1px solid ${inspectRecord.domain === 'fulfillment' ? '#7c3aed' : '#0284c7'}`,
                     }}
                   >
-                    {inspectRecord.domain || 'checkout'}
+                    {String(inspectRecord.domain || 'checkout')}
                   </span>
                   <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#fafafa' }}>
                     Interception Audit Detail
                   </h3>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#71717a', marginTop: 4, fontFamily: 'monospace' }}>
-                  Log ID: {inspectRecord.id} &bull; Session: {inspectRecord.sessionId}
+                  Log ID: {String(inspectRecord.id || '')} &bull; Session: {String(inspectRecord.sessionId || '')}
                 </div>
               </div>
 
@@ -2843,7 +2914,7 @@ export default function ShowcasePage() {
                       overflowX: 'auto',
                     }}
                   >
-                    {JSON.stringify(inspectRecord.response, null, 2)}
+                    {safeFormatJson(inspectRecord.response)}
                   </pre>
                 </div>
               )}
@@ -2866,7 +2937,7 @@ export default function ShowcasePage() {
                     maxHeight: 280,
                   }}
                 >
-                  {JSON.stringify(inspectRecord.payload, null, 2)}
+                  {safeFormatJson(inspectRecord.payload)}
                 </pre>
               </div>
             </div>
@@ -2889,6 +2960,44 @@ export default function ShowcasePage() {
       </footer>
     </div>
   );
+}
+
+/**
+ * Safely format payloads and responses as readable JSON for display,
+ * preventing crashes from circular references, BigInts, or malformed data.
+ */
+function safeFormatJson(val: any): string {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return val;
+    }
+  }
+  try {
+    const seen = new WeakSet();
+    return JSON.stringify(
+      val,
+      (key, value) => {
+        if (typeof value === 'bigint') return value.toString();
+        if (typeof value === 'object' && value !== null) {
+          if ('_reactName' in value || 'nativeEvent' in value) {
+            return '[React Event]';
+          }
+          if (seen.has(value)) {
+            return '[Circular]';
+          }
+          seen.add(value);
+        }
+        return value;
+      },
+      2
+    );
+  } catch {
+    return String(val);
+  }
 }
 
 /**
