@@ -2,6 +2,7 @@ import React from 'react';
 import { db, schema } from '@/db';
 import { desc } from 'drizzle-orm';
 import Link from 'next/link';
+import { AutoRefresh } from './AutoRefresh';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -47,8 +48,8 @@ export default async function GovernanceDashboardPage() {
       }}
       className="max-w-6xl mx-auto px-6 py-8"
     >
-      {/* Auto-refresh feed every 5 seconds for real-time telemetry */}
-      <meta httpEquiv="refresh" content="5" />
+      {/* Auto-refresh feed every 5 seconds for real-time telemetry (client-side, cleans up on unmount) */}
+      <AutoRefresh intervalMs={5000} />
 
       {/* Header */}
       <header
