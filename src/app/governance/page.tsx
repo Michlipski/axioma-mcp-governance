@@ -103,6 +103,24 @@ export default async function GovernanceDashboardPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="flex items-center gap-2">
+          <a
+            href="https://mlipski.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              padding: '8px 14px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              background: '#f1f5f9',
+              color: '#334155',
+              borderRadius: 6,
+              textDecoration: 'none',
+              border: '1px solid #cbd5e1',
+            }}
+            className="px-3.5 py-2 text-xs font-semibold bg-slate-100 text-slate-700 rounded-md border border-slate-300 hover:bg-slate-200"
+          >
+            Portfolio
+          </a>
           <Link
             href="/"
             style={{

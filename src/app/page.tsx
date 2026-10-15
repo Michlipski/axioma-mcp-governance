@@ -61,6 +61,23 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <a
+            href="https://mlipski.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              padding: '8px 14px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              background: '#f1f5f9',
+              color: '#334155',
+              borderRadius: 6,
+              textDecoration: 'none',
+              border: '1px solid #cbd5e1',
+            }}
+          >
+            Portfolio
+          </a>
           <Link
             href="/showcase"
             style={{

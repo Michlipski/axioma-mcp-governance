@@ -847,6 +847,25 @@ export default function ShowcasePage() {
             </div>
 
             {/* Links */}
+            <a
+              href="https://mlipski.ca"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#d4d4d8',
+                backgroundColor: '#18181b',
+                border: '1px solid #27272a',
+                borderRadius: 6,
+                textDecoration: 'none',
+              }}
+              className="px-3 py-1.5 text-xs font-semibold text-zinc-300 bg-zinc-900 border border-zinc-800 rounded hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+            >
+              Portfolio
+            </a>
+
             <Link
               href="/governance"
               style={{
