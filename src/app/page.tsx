@@ -39,33 +39,103 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
   const currentColor = stateColors[String(currentState)] || '#64748b';
 
   return (
-    <main style={{ maxWidth: 860, margin: '40px auto', padding: '0 20px', fontFamily: 'sans-serif' }}>
+    <main
+      style={{
+        maxWidth: 920,
+        margin: '0 auto',
+        padding: '32px 24px',
+        color: '#f4f4f5',
+        fontFamily:
+          'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
       <header
         style={{
-          borderBottom: '1px solid #e2e8f0',
-          paddingBottom: 20,
-          marginBottom: 24,
+          borderBottom: '1px solid #27272a',
+          paddingBottom: 24,
+          marginBottom: 28,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           flexWrap: 'wrap',
           gap: 16,
         }}
       >
-        <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 8px 0' }}>
-            Axioma: Executable Architecture Sandbox
-          </h1>
-          <p style={{ color: '#64748b', margin: 0 }}>
-            Declaratively bounded e-commerce checkout flow governed by XState v5 and GraphQL nouns.
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 8,
+              backgroundColor: '#18181b',
+              border: '1px solid #3f3f46',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 900,
+              color: '#10b981',
+              fontSize: '1.2rem',
+            }}
+          >
+            &Delta;
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h1
+                style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 800,
+                  margin: 0,
+                  letterSpacing: '-0.02em',
+                  color: '#fafafa',
+                }}
+              >
+                Axioma: Executable Architecture Sandbox
+              </h1>
+              <span
+                style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  backgroundColor: '#18181b',
+                  color: '#a1a1aa',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  border: '1px solid #27272a',
+                }}
+              >
+                Checkout Domain
+              </span>
+            </div>
+            <p style={{ color: '#71717a', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
+              Declaratively bounded e-commerce checkout flow governed by XState v5 and GraphQL nouns.
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <a
+            href="https://mlipski.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#d4d4d8',
+              backgroundColor: '#18181b',
+              border: '1px solid #27272a',
+              borderRadius: 6,
+              textDecoration: 'none',
+            }}
+          >
+            Portfolio
+          </a>
           <Link
             href="/showcase"
             style={{
-              padding: '8px 14px',
-              fontSize: '0.85rem',
+              padding: '6px 12px',
+              fontSize: '0.75rem',
               fontWeight: 600,
               background: '#047857',
               color: '#ecfdf5',
@@ -79,14 +149,14 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
           <Link
             href="/governance"
             style={{
-              padding: '8px 14px',
-              fontSize: '0.85rem',
+              padding: '6px 12px',
+              fontSize: '0.75rem',
               fontWeight: 600,
-              background: '#f1f5f9',
-              color: '#334155',
+              color: '#d4d4d8',
+              backgroundColor: '#18181b',
+              border: '1px solid #27272a',
               borderRadius: 6,
               textDecoration: 'none',
-              border: '1px solid #cbd5e1',
             }}
           >
             Telemetry &rarr;
@@ -95,19 +165,65 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
       </header>
 
       {/* State Badge */}
-      <section style={{ background: '#ffffff', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: 24 }}>
+      <section
+        style={{
+          background: '#18181b',
+          border: '1px solid #27272a',
+          padding: 20,
+          borderRadius: 8,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+          marginBottom: 24,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#64748b', letterSpacing: 1, fontWeight: 600 }}>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                textTransform: 'uppercase',
+                color: '#71717a',
+                letterSpacing: 1.2,
+                fontWeight: 700,
+              }}
+            >
               Active State Boundary
             </span>
-            <h2 style={{ margin: '4px 0 0 0', color: currentColor, fontSize: '1.5rem', fontWeight: 800 }}>
-              {String(currentState).toUpperCase()}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  backgroundColor: currentColor,
+                  boxShadow: `0 0 8px ${currentColor}`,
+                }}
+              />
+              <h2
+                style={{
+                  margin: 0,
+                  color: currentColor,
+                  fontSize: '1.5rem',
+                  fontWeight: 800,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {String(currentState).toUpperCase()}
+              </h2>
+            </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Order Total</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                textTransform: 'uppercase',
+                color: '#71717a',
+                letterSpacing: 1,
+                fontWeight: 700,
+              }}
+            >
+              Order Total
+            </span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fafafa', marginTop: 2 }}>
               ${(context.totalCents / 100).toFixed(2)}
             </div>
           </div>
@@ -117,14 +233,34 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
       {/* State Machine Step Controller */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         {/* Left Column: Actions for Current State */}
-        <section style={{ background: '#ffffff', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h3 style={{ marginTop: 0, fontSize: '1.1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+        <section
+          style={{
+            background: '#18181b',
+            border: '1px solid #27272a',
+            padding: 20,
+            borderRadius: 8,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+          }}
+        >
+          <h3
+            style={{
+              marginTop: 0,
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              color: '#fafafa',
+              borderBottom: '1px solid #27272a',
+              paddingBottom: 12,
+              marginBottom: 16,
+            }}
+          >
             Admissible State Transitions
           </h3>
 
           {currentState === 'empty_cart' && (
             <div>
-              <p style={{ color: '#64748b' }}>Your cart is empty. Axiom 1 enforces that SUBMIT_PAYMENT cannot fire.</p>
+              <p style={{ color: '#a1a1aa' }}>
+                Your cart is empty. Axiom 1 enforces that SUBMIT_PAYMENT cannot fire.
+              </p>
               <button
                 onClick={() =>
                   send({
@@ -138,7 +274,15 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                     },
                   })
                 }
-                style={{ padding: '10px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                style={{
+                  padding: '10px 16px',
+                  background: '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
               >
                 + Add Item to Cart ($32.00)
               </button>
@@ -147,7 +291,9 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
 
           {currentState === 'cart_active' && (
             <div>
-              <p style={{ color: '#64748b' }}>Cart is ACTIVE. Items can be added, updated, removed, or checked out.</p>
+              <p style={{ color: '#a1a1aa' }}>
+                Cart is ACTIVE. Items can be added, updated, removed, or checked out.
+              </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                 <button
                   onClick={() =>
@@ -162,7 +308,16 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                       },
                     })
                   }
-                  style={{ padding: '8px 12px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontSize: '0.9rem' }}
+                  style={{
+                    padding: '8px 12px',
+                    background: '#27272a',
+                    border: '1px solid #3f3f46',
+                    color: '#e4e4e7',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                  }}
                 >
                   + Add Sticker ($6.00)
                 </button>
@@ -179,14 +334,32 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                       },
                     })
                   }
-                  style={{ padding: '8px 12px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontSize: '0.9rem' }}
+                  style={{
+                    padding: '8px 12px',
+                    background: '#27272a',
+                    border: '1px solid #3f3f46',
+                    color: '#e4e4e7',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                  }}
                 >
                   + Add Cap ($24.00)
                 </button>
               </div>
               <button
                 onClick={() => send({ type: 'INITIATE_CHECKOUT' })}
-                style={{ width: '100%', padding: '10px 16px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  background: '#7c3aed',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
               >
                 Initiate Checkout &rarr;
               </button>
@@ -195,21 +368,53 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
 
           {currentState === 'checkout_draft' && (
             <div>
-              <p style={{ color: '#64748b' }}>Order draft initialized. Attach shipping address to proceed.</p>
+              <p style={{ color: '#a1a1aa' }}>
+                Order draft initialized. Attach shipping address to proceed.
+              </p>
 
               {/* Discount Code Application */}
-              <div style={{ padding: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 16 }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+              <div
+                style={{
+                  padding: 12,
+                  background: '#121215',
+                  border: '1px solid #27272a',
+                  borderRadius: 6,
+                  marginBottom: 16,
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: '#d4d4d8',
+                    display: 'block',
+                    marginBottom: 4,
+                  }}
+                >
                   Promo / Discount Code
                 </label>
                 {context.discountCode ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 700 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.85rem', color: '#34d399', fontWeight: 700 }}>
                       Code Applied: {context.discountCode} (-${(context.discountCents / 100).toFixed(2)})
                     </span>
                     <button
                       onClick={() => send({ type: 'REMOVE_DISCOUNT' })}
-                      style={{ padding: '4px 8px', fontSize: '0.75rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer' }}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        background: '#3f1515',
+                        color: '#fca5a5',
+                        border: '1px solid #7f1d1d',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                      }}
                     >
                       Remove
                     </button>
@@ -221,15 +426,35 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                       placeholder="e.g. SAVE10, SAVE20"
                       value={discountInput}
                       onChange={(e) => setDiscountInput(e.target.value)}
-                      style={{ flex: 1, padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '0.85rem' }}
+                      style={{
+                        flex: 1,
+                        padding: '6px 10px',
+                        background: '#09090b',
+                        border: '1px solid #3f3f46',
+                        color: '#fafafa',
+                        borderRadius: 4,
+                        fontSize: '0.85rem',
+                      }}
                     />
                     <button
                       onClick={() => {
                         const code = discountInput.trim().toUpperCase();
-                        const amount = code === 'SAVE20' || code === 'AXIOM20' || code === 'SUMMER20' ? 2000 : 1000;
+                        const amount =
+                          code === 'SAVE20' || code === 'AXIOM20' || code === 'SUMMER20'
+                            ? 2000
+                            : 1000;
                         send({ type: 'APPLY_DISCOUNT', code, discountCents: amount });
                       }}
-                      style={{ padding: '6px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#2563eb',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                      }}
                     >
                       Apply
                     </button>
@@ -237,58 +462,187 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                 )}
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Recipient Name</label>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: '#d4d4d8',
+                    display: 'block',
+                    marginBottom: 4,
+                  }}
+                >
+                  Recipient Name
+                </label>
                 <input
                   type="text"
                   value={shippingInput.recipientName}
-                  onChange={(e) => setShippingInput({ ...shippingInput, recipientName: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 4, marginBottom: 8, boxSizing: 'border-box' }}
+                  onChange={(e) =>
+                    setShippingInput({ ...shippingInput, recipientName: e.target.value })
+                  }
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    background: '#09090b',
+                    border: '1px solid #3f3f46',
+                    color: '#fafafa',
+                    borderRadius: 4,
+                    marginBottom: 8,
+                    boxSizing: 'border-box',
+                  }}
                 />
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Address Line 1</label>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: '#d4d4d8',
+                    display: 'block',
+                    marginBottom: 4,
+                  }}
+                >
+                  Address Line 1
+                </label>
                 <input
                   type="text"
                   value={shippingInput.addressLine1}
-                  onChange={(e) => setShippingInput({ ...shippingInput, addressLine1: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 4, marginBottom: 8, boxSizing: 'border-box' }}
+                  onChange={(e) =>
+                    setShippingInput({ ...shippingInput, addressLine1: e.target.value })
+                  }
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    background: '#09090b',
+                    border: '1px solid #3f3f46',
+                    color: '#fafafa',
+                    borderRadius: 4,
+                    marginBottom: 8,
+                    boxSizing: 'border-box',
+                  }}
                 />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>City</label>
+                    <label
+                      style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        color: '#d4d4d8',
+                        display: 'block',
+                        marginBottom: 4,
+                      }}
+                    >
+                      City
+                    </label>
                     <input
                       type="text"
                       value={shippingInput.city}
-                      onChange={(e) => setShippingInput({ ...shippingInput, city: e.target.value })}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 4, boxSizing: 'border-box' }}
+                      onChange={(e) =>
+                        setShippingInput({ ...shippingInput, city: e.target.value })
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        background: '#09090b',
+                        border: '1px solid #3f3f46',
+                        color: '#fafafa',
+                        borderRadius: 4,
+                        boxSizing: 'border-box',
+                      }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Postal Code</label>
+                    <label
+                      style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        color: '#d4d4d8',
+                        display: 'block',
+                        marginBottom: 4,
+                      }}
+                    >
+                      Postal Code
+                    </label>
                     <input
                       type="text"
                       value={shippingInput.postalCode}
-                      onChange={(e) => setShippingInput({ ...shippingInput, postalCode: e.target.value })}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 4, boxSizing: 'border-box' }}
+                      onChange={(e) =>
+                        setShippingInput({ ...shippingInput, postalCode: e.target.value })
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        background: '#09090b',
+                        border: '1px solid #3f3f46',
+                        color: '#fafafa',
+                        borderRadius: 4,
+                        boxSizing: 'border-box',
+                      }}
                     />
                   </div>
                 </div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 4 }}>Country</label>
+                <label
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: '#d4d4d8',
+                    display: 'block',
+                    marginBottom: 4,
+                  }}
+                >
+                  Country
+                </label>
                 <input
                   type="text"
                   value={shippingInput.country}
-                  onChange={(e) => setShippingInput({ ...shippingInput, country: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: 4, boxSizing: 'border-box' }}
+                  onChange={(e) =>
+                    setShippingInput({ ...shippingInput, country: e.target.value })
+                  }
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    background: '#09090b',
+                    border: '1px solid #3f3f46',
+                    color: '#fafafa',
+                    borderRadius: 4,
+                    boxSizing: 'border-box',
+                  }}
                 />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => send({ type: 'CANCEL_CHECKOUT' })}
-                  style={{ flex: 1, padding: '10px 14px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    background: '#27272a',
+                    color: '#d4d4d8',
+                    border: '1px solid #3f3f46',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
                 >
                   &larr; Back to Cart
                 </button>
                 <button
-                  onClick={() => send({ type: 'ATTACH_SHIPPING', address: shippingInput, shippingCents: 500 })}
-                  style={{ flex: 2, padding: '10px 16px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() =>
+                    send({ type: 'ATTACH_SHIPPING', address: shippingInput, shippingCents: 500 })
+                  }
+                  style={{
+                    flex: 2,
+                    padding: '10px 16px',
+                    background: '#d97706',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
                 >
                   Confirm Shipping &rarr;
                 </button>
@@ -298,7 +652,9 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
 
           {currentState === 'pending_payment' && (
             <div>
-              <p style={{ color: '#64748b' }}>Order ready for payment. Idempotent submission required.</p>
+              <p style={{ color: '#a1a1aa' }}>
+                Order ready for payment. Idempotent submission required.
+              </p>
               <button
                 onClick={() => {
                   send({
@@ -307,13 +663,32 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                     amountCents: context.totalCents,
                   });
                 }}
-                style={{ width: '100%', padding: '12px 16px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, marginBottom: 8 }}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: '#059669',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  marginBottom: 8,
+                }}
               >
                 Submit Payment (${(context.totalCents / 100).toFixed(2)})
               </button>
               <button
                 onClick={() => send({ type: 'CANCEL_CHECKOUT' })}
-                style={{ width: '100%', padding: '10px 14px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  background: '#27272a',
+                  color: '#d4d4d8',
+                  border: '1px solid #3f3f46',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
               >
                 &larr; Cancel Checkout (Return to Cart)
               </button>
@@ -322,17 +697,42 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
 
           {currentState === 'payment_processing' && (
             <div>
-              <p style={{ color: '#64748b' }}>Simulating gateway settlement...</p>
+              <p style={{ color: '#a1a1aa' }}>Simulating gateway settlement...</p>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
-                  onClick={() => send({ type: 'PAYMENT_SUCCESS', paymentId: `pay_${Date.now()}` })}
-                  style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() =>
+                    send({ type: 'PAYMENT_SUCCESS', paymentId: `pay_${Date.now()}` })
+                  }
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: '#059669',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
                 >
                   Gateway Success
                 </button>
                 <button
-                  onClick={() => send({ type: 'PAYMENT_ERROR', errorMessage: 'Card declined by issuing bank' })}
-                  style={{ flex: 1, padding: '10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() =>
+                    send({
+                      type: 'PAYMENT_ERROR',
+                      errorMessage: 'Card declined by issuing bank',
+                    })
+                  }
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: '#b91c1c',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
                 >
                   Gateway Decline
                 </button>
@@ -342,19 +742,46 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
 
           {currentState === 'payment_failed' && (
             <div>
-              <div style={{ padding: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 6, marginBottom: 12 }}>
+              <div
+                style={{
+                  padding: 12,
+                  background: '#3f1515',
+                  border: '1px solid #7f1d1d',
+                  color: '#fca5a5',
+                  borderRadius: 6,
+                  marginBottom: 12,
+                }}
+              >
                 Payment Failed: {context.paymentError}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => send({ type: 'CANCEL_CHECKOUT' })}
-                  style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: '#27272a',
+                    color: '#d4d4d8',
+                    border: '1px solid #3f3f46',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
                 >
                   &larr; Return to Cart
                 </button>
                 <button
                   onClick={() => send({ type: 'RETRY_PAYMENT' })}
-                  style={{ flex: 1, padding: '10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: '#2563eb',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
                 >
                   Retry Payment
                 </button>
@@ -364,7 +791,16 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
 
           {currentState === 'paid' && (
             <div>
-              <div style={{ padding: 12, background: '#dcfce7', color: '#166534', borderRadius: 6, marginBottom: 12 }}>
+              <div
+                style={{
+                  padding: 12,
+                  background: '#064e3b',
+                  border: '1px solid #059669',
+                  color: '#6ee7b7',
+                  borderRadius: 6,
+                  marginBottom: 12,
+                }}
+              >
                 Payment verified! Payment ID: {context.paymentId}
               </div>
               <button
@@ -375,7 +811,16 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                     carrier: 'FedEx Express',
                   })
                 }
-                style={{ width: '100%', padding: '10px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: '#047857',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
               >
                 Dispatch Warehouse Fulfillment &rarr;
               </button>
@@ -383,13 +828,34 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
           )}
 
           {currentState === 'fulfilled' && (
-            <div style={{ padding: 16, background: '#ecfdf5', color: '#065f46', borderRadius: 6, textAlign: 'center' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '1.2rem' }}>Order Fulfilled!</h4>
-              <p style={{ margin: 0 }}>Carrier: {context.carrier}</p>
-              <p style={{ margin: '4px 0 16px 0', fontWeight: 700 }}>Tracking: {context.trackingNumber}</p>
+            <div
+              style={{
+                padding: 16,
+                background: '#064e3b',
+                border: '1px solid #059669',
+                color: '#6ee7b7',
+                borderRadius: 6,
+                textAlign: 'center',
+              }}
+            >
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#ecfdf5' }}>
+                Order Fulfilled!
+              </h4>
+              <p style={{ margin: 0, color: '#a7f3d0' }}>Carrier: {context.carrier}</p>
+              <p style={{ margin: '4px 0 16px 0', fontWeight: 700, color: '#ecfdf5' }}>
+                Tracking: {context.trackingNumber}
+              </p>
               <button
                 onClick={onReset}
-                style={{ padding: '10px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                style={{
+                  padding: '10px 16px',
+                  background: '#10b981',
+                  color: '#064e3b',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
               >
                 Continue Shopping (New Cart)
               </button>
@@ -398,13 +864,31 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
         </section>
 
         {/* Right Column: Context Snapshot */}
-        <section style={{ background: '#ffffff', padding: 20, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h3 style={{ marginTop: 0, fontSize: '1.1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+        <section
+          style={{
+            background: '#18181b',
+            border: '1px solid #27272a',
+            padding: 20,
+            borderRadius: 8,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+          }}
+        >
+          <h3
+            style={{
+              marginTop: 0,
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              color: '#fafafa',
+              borderBottom: '1px solid #27272a',
+              paddingBottom: 12,
+              marginBottom: 16,
+            }}
+          >
             Current Context Snapshot
           </h3>
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px 0' }}>
             {context.items.length === 0 ? (
-              <li style={{ color: '#94a3b8', fontStyle: 'italic' }}>No items in cart</li>
+              <li style={{ color: '#71717a', fontStyle: 'italic' }}>No items in cart</li>
             ) : (
               context.items.map((item) => (
                 <li
@@ -414,12 +898,12 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '8px 0',
-                    borderBottom: '1px solid #f8fafc',
+                    borderBottom: '1px solid #27272a',
                   }}
                 >
                   <div style={{ flex: 1, paddingRight: 8 }}>
-                    <div style={{ fontWeight: 600, color: '#1e293b' }}>{item.title}</div>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    <div style={{ fontWeight: 600, color: '#fafafa' }}>{item.title}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>
                       ${(item.unitPriceCents / 100).toFixed(2)} each &times; {item.quantity}
                     </div>
                   </div>
@@ -440,9 +924,10 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                             width: 24,
                             height: 24,
                             padding: 0,
-                            border: '1px solid #cbd5e1',
+                            border: '1px solid #3f3f46',
                             borderRadius: 4,
-                            background: '#f8fafc',
+                            background: '#27272a',
+                            color: '#e4e4e7',
                             cursor: 'pointer',
                             fontWeight: 700,
                             lineHeight: '22px',
@@ -450,7 +935,14 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                         >
                           -
                         </button>
-                        <span style={{ fontSize: '0.9rem', minWidth: 20, textAlign: 'center' }}>
+                        <span
+                          style={{
+                            fontSize: '0.9rem',
+                            minWidth: 20,
+                            textAlign: 'center',
+                            color: '#fafafa',
+                          }}
+                        >
                           {item.quantity}
                         </span>
                         <button
@@ -466,9 +958,10 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                             width: 24,
                             height: 24,
                             padding: 0,
-                            border: '1px solid #cbd5e1',
+                            border: '1px solid #3f3f46',
                             borderRadius: 4,
-                            background: '#f8fafc',
+                            background: '#27272a',
+                            color: '#e4e4e7',
                             cursor: 'pointer',
                             fontWeight: 700,
                             lineHeight: '22px',
@@ -483,10 +976,10 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                             marginLeft: 4,
                             padding: '3px 8px',
                             fontSize: '0.75rem',
-                            border: '1px solid #fca5a5',
+                            border: '1px solid #7f1d1d',
                             borderRadius: 4,
-                            background: '#fef2f2',
-                            color: '#b91c1c',
+                            background: '#3f1515',
+                            color: '#fca5a5',
                             cursor: 'pointer',
                           }}
                         >
@@ -494,7 +987,14 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
                         </button>
                       </div>
                     )}
-                    <span style={{ fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        minWidth: 60,
+                        textAlign: 'right',
+                        color: '#fafafa',
+                      }}
+                    >
                       ${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}
                     </span>
                   </div>
@@ -502,16 +1002,32 @@ function CheckoutView({ onReset }: { onReset: () => void }) {
               ))
             )}
           </ul>
-          <div style={{ fontSize: '0.85rem', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
+          <div
+            style={{
+              fontSize: '0.85rem',
+              color: '#a1a1aa',
+              borderTop: '1px solid #27272a',
+              paddingTop: 12,
+            }}
+          >
             <div>Subtotal: ${(context.subtotalCents / 100).toFixed(2)}</div>
-            <div>Shipping: ${(context.shippingCents / 100).toFixed(2)}</div>
-            <div>Tax (8%): ${(context.taxCents / 100).toFixed(2)}</div>
+            <div style={{ marginTop: 2 }}>Shipping: ${(context.shippingCents / 100).toFixed(2)}</div>
+            <div style={{ marginTop: 2 }}>Tax (8%): ${(context.taxCents / 100).toFixed(2)}</div>
             {context.discountCents > 0 && (
-              <div style={{ color: '#16a34a', fontWeight: 600 }}>
+              <div style={{ color: '#34d399', fontWeight: 600, marginTop: 2 }}>
                 Discount ({context.discountCode}): -${(context.discountCents / 100).toFixed(2)}
               </div>
             )}
-            <div style={{ fontWeight: 700, color: '#0f172a', marginTop: 4 }}>
+            <div
+              style={{
+                fontWeight: 700,
+                color: '#fafafa',
+                fontSize: '1rem',
+                marginTop: 6,
+                paddingTop: 6,
+                borderTop: '1px dashed #27272a',
+              }}
+            >
               Total: ${(context.totalCents / 100).toFixed(2)}
             </div>
           </div>
